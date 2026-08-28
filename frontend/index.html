@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APIDash</title>
+  <meta name="description"
+    content="Monitor, test and analyse the health of your APIs in real time with automated 30-second scheduling and rich analytics." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- Animated Mesh/Aurora Background -->
+  <div class="aurora-bg">
+    <div class="aurora-blob aurora-1"></div>
+    <div class="aurora-blob aurora-2"></div>
+    <div class="aurora-blob aurora-3"></div>
+    <div class="aurora-blob aurora-4"></div>
+    <div class="noise-overlay"></div>
+  </div>
+
+  <!-- ── Header ── -->
+  <header class="header glass-panel">
+    <div class="header-inner">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="logo-text">API<span class="logo-accent">Dash</span></span>
+      </div>
+
+      <!-- ── Nav Tabs ── -->
+      <nav class="nav-tabs" role="tablist" aria-label="Main navigation">
+        <button class="nav-tab active" id="tabDashboard" role="tab" aria-selected="true" data-tab="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+          Dashboard
+        </button>
+        <button class="nav-tab" id="tabAnalytics" role="tab" aria-selected="false" data-tab="analytics">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Analytics
+        </button>
+      </nav>
+
+      <div class="header-stats" id="headerStats">
+        <div class="stat-pill glass-pill" id="totalStat">
+          <svg class="pill-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+            </path>
+          </svg>
+          <span id="totalCount" class="font-mono">0</span> APIs
+        </div>
+        <div class="stat-pill glass-pill" id="schedulerPill">
+          <div class="countdown-ring">
+            <svg viewBox="0 0 36 36">
+              <path class="countdown-ring-bg"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path class="countdown-ring-circle" stroke-dasharray="100, 100"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <span class="countdown-text font-mono" id="countdownText">30</span>
+          </div>
+          <span>Next Run</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════
+       TAB: DASHBOARD
+  ══════════════════════════════════════════════════════════ -->
+  <div id="viewDashboard" class="tab-view">
+
+    <main class="main">
+      <!-- ── LEFT: Add API ── -->
+      <section class="panel glass-panel panel-add" aria-label="Add API">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Register API
+          </h2>
+          <p class="panel-subtitle">Add a new endpoint to monitor</p>
+        </div>
+
+        <form id="addApiForm" class="form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="apiName">API Name</label>
+            <input id="apiName" class="form-input" type="text" placeholder="e.g. GitHub Status" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="apiUrl">Endpoint URL</label>
+            <input id="apiUrl" class="form-input" type="url" placeholder="https://api.example.com/health" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="apiMethod">Method</label>
+              <div class="select-wrapper">
+                <select id="apiMethod" class="form-select">
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="PATCH">PATCH</option>
+                  <option value="DELETE">DELETE</option>
+                  <option value="HEAD">HEAD</option>
+                </select>
+                <svg class="select-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="expectedStatus">Expected Status</label>
+              <input id="expectedStatus" class="form-input font-mono" type="number" value="200" min="100" max="599"
+                required />
+            </div>
+          </div>
+
+          <button id="addBtn" class="btn btn-primary glow-effect" type="submit">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add &amp; Monitor
+          </button>
+        </form>
+
+        <div id="addFeedback" class="feedback hidden"></div>
+      </section>
+
+      <!-- ── RIGHT: API List ── -->
+      <section class="panel glass-panel panel-list" aria-label="Monitored APIs">
+        <div class="panel-header flex-between">
+          <div>
+            <h2 class="panel-title">
+              <svg class="panel-icon text-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Monitored APIs
+            </h2>
+            <p class="panel-subtitle">Endpoints actively monitored by the scheduler</p>
+          </div>
+          <button id="refreshBtn" class="btn btn-ghost" title="Refresh list">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
+
+        <div id="apiList" class="api-list">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon-wrap glow-pulse">
+              <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <p class="empty-title">No APIs registered yet.</p>
+            <p class="empty-sub">Add your first endpoint on the left to start monitoring.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ── Stats + Chart Section ── -->
+    <section class="chart-section" aria-label="Performance Overview">
+
+      <div class="stats-row">
+        <div class="stat-card glass-panel group">
+          <div class="stat-card-icon text-blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+              </path>
+            </svg>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Total APIs</div>
+            <div class="stat-card-value" id="scTotal">—</div>
+          </div>
+          <div class="stat-card-bg bg-blue"></div>
+        </div>
+        <div class="stat-card glass-panel stat-card-pass group">
+          <div class="stat-card-icon text-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Passing Checks</div>
+            <div class="stat-card-value text-green" id="scPassing">—</div>
+          </div>
+          <div class="stat-card-bg bg-green"></div>
+        </div>
+        <div class="stat-card glass-panel stat-card-fail group">
+          <div class="stat-card-icon text-red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Failing Checks</div>
+            <div class="stat-card-value text-red" id="scFailing">—</div>
+          </div>
+          <div class="stat-card-bg bg-red"></div>
+        </div>
+        <div class="stat-card glass-panel stat-card-time group">
+          <div class="stat-card-icon text-cyan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Avg Response</div>
+            <div class="stat-card-value text-cyan" id="scAvgTime">—</div>
+          </div>
+          <div class="stat-card-bg bg-cyan"></div>
+        </div>
+      </div>
+
+      <div class="chart-panel glass-panel">
+        <div class="chart-panel-header">
+          <div>
+            <h2 class="panel-title">
+              <svg class="panel-icon text-violet" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+              Response Time Trend
+            </h2>
+            <p class="panel-subtitle">Latency over the last 10 test cycles</p>
+          </div>
+          <div class="chart-legend" id="chartLegend"></div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="responseChart"></canvas>
+        </div>
+        <div class="chart-empty hidden" id="chartEmpty">
+          <p>No test data available yet.</p>
+        </div>
+      </div>
+
+    </section>
+  </div><!-- /viewDashboard -->
+
+
+  <!-- ══════════════════════════════════════════════════════════
+       TAB: ANALYTICS
+  ══════════════════════════════════════════════════════════ -->
+  <div id="viewAnalytics" class="tab-view hidden">
+
+    <!-- Global summary hero cards -->
+    <div class="analytics-hero">
+      <div class="ah-card glass-panel" id="ahUptime">
+        <div class="ah-card-bg bg-green"></div>
+        <div class="ah-icon text-green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="ah-content">
+          <div class="ah-label">Global Uptime</div>
+          <div class="ah-value" id="aGlobalUptime">—</div>
+          <div class="ah-sub">last <span class="ah-sub-hl">24h</span></div>
+        </div>
+      </div>
+      <div class="ah-card glass-panel" id="ahP95">
+        <div class="ah-card-bg bg-violet"></div>
+        <div class="ah-icon text-violet">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div class="ah-content">
+          <div class="ah-label">P95 Latency</div>
+          <div class="ah-value" id="aGlobalP95">—</div>
+          <div class="ah-sub">95th percentile</div>
+        </div>
+      </div>
+      <div class="ah-card glass-panel" id="ahChecks">
+        <div class="ah-card-bg bg-blue"></div>
+        <div class="ah-icon text-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </div>
+        <div class="ah-content">
+          <div class="ah-label">Total Checks</div>
+          <div class="ah-value" id="aGlobalChecks">—</div>
+          <div class="ah-sub" id="aGlobalChecksSub">all APIs combined</div>
+        </div>
+      </div>
+      <div class="ah-card glass-panel" id="ahAvg">
+        <div class="ah-card-bg bg-cyan"></div>
+        <div class="ah-icon text-cyan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <div class="ah-content">
+          <div class="ah-label">Avg Latency</div>
+          <div class="ah-value" id="aGlobalAvg">—</div>
+          <div class="ah-sub">across all APIs</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Time window selector + refresh -->
+    <div class="analytics-toolbar">
+      <div class="window-tabs glass-panel" id="windowTabs">
+        <button class="win-btn" data-hours="1">1h</button>
+        <button class="win-btn" data-hours="6">6h</button>
+        <button class="win-btn active" data-hours="24">24h</button>
+        <button class="win-btn" data-hours="48">48h</button>
+        <button class="win-btn" data-hours="168">7d</button>
+      </div>
+      <button id="analyticsRefreshBtn" class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Refresh
+      </button>
+    </div>
+
+    <!-- Scheduler runs timeline chart -->
+    <div class="chart-panel glass-panel" style="margin: 0 2rem 1.5rem;">
+      <div class="chart-panel-header">
+        <div>
+          <h2 class="panel-title">
+            <svg class="panel-icon text-yellow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Scheduler Timeline
+          </h2>
+          <p class="panel-subtitle">Passed vs failed checks per 30s cycle</p>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="schedulerChart"></canvas>
+      </div>
+      <div class="chart-empty hidden" id="schedulerChartEmpty">
+        <p>Awaiting first 30s scheduler cycle...</p>
+      </div>
+    </div>
+
+    <!-- Per-API analytics cards -->
+    <div class="analytics-toolbar" style="margin-top:0; padding-bottom:0.5rem">
+      <h2 class="panel-title" style="margin:0">
+        <svg class="panel-icon text-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+          </path>
+        </svg>
+        Endpoint Analysis
+      </h2>
+    </div>
+    <div id="perApiGrid" class="per-api-grid">
+      <div class="analytics-empty glass-panel" id="analyticsEmpty">
+        <div class="empty-icon-wrap glow-pulse">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <p class="empty-title">No analytics available.</p>
+        <p class="empty-sub">Add APIs to begin tracking metrics.</p>
+      </div>
+    </div>
+
+  </div><!-- /viewAnalytics -->
+
+
+  <!-- ── Result Modal ── -->
+  <div id="resultModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Test Result">
+    <div class="modal glass-panel">
+      <button class="modal-close" id="modalClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <h3 class="modal-title" id="modalTitle">Test Result</h3>
+
+      <div class="result-badge-wrap">
+        <span id="resultBadge" class="result-badge"></span>
+      </div>
+
+      <div class="result-grid" id="resultGrid"></div>
+
+      <div class="result-json-wrap">
+        <div class="json-label">Raw JSON Payload</div>
+        <pre id="resultJson" class="result-json font-mono"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Toast ── -->
+  <div id="toast" class="toast hidden" role="alert"></div>
+
+  <script>
+    // Countdown Timer logic
+    (function () {
+      let remain = 30;
+      const el = document.getElementById('countdownText');
+      const ring = document.querySelector('.countdown-ring-circle');
+      setInterval(() => {
+        remain--;
+        if (remain <= 0) remain = 30;
+        if (el) el.textContent = remain;
+        if (ring) {
+          const pct = (remain / 30) * 100;
+          ring.style.strokeDasharray = `${pct}, 100`;
+        }
+      }, 1000);
+    })();
+
+    // Uptime Rings observer for dynamically injected analytic cards
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll('.aac-metric:first-child').forEach(el => {
+        if (!el.dataset.ringAdded) {
+          el.dataset.ringAdded = 'true';
+          const valEl = el.querySelector('.aac-metric-val');
+          if (valEl) {
+            const text = valEl.textContent;
+            const pct = parseFloat(text) || 0;
+            el.style.setProperty('--pct', pct + '%');
+            el.classList.add('uptime-ring-container');
+            const color = window.getComputedStyle(valEl).color;
+            el.style.setProperty('--ring-color', color);
+          }
+        }
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  </script>
+  <script src="app.js"></script>
+</body>
+
+</html>
