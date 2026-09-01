@@ -155,8 +155,8 @@ CREATE TABLE IF NOT EXISTS scheduler_runs (
 
 ### 2. Clone the Repository
 ```bash
-git clone https://github.com/shivanandmanami/New-project.git
-cd New-project
+git clone https://github.com/ritesh0w0/api-health-monitor.git
+cd api-health-monitor
 ```
 
 ### 3. Configure Database & Environment
