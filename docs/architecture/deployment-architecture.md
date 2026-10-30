@@ -8,34 +8,27 @@ APIDash is deployed to a hardened, cost-efficient cloud environment on Microsoft
 
 ```mermaid
 graph TB
-    subgraph AzureRegion ["Microsoft Azure — Region: Central India"]
-        subgraph RG ["Resource Group: rg-apidash"]
-            subgraph VNet ["Virtual Network / NSG"]
-                subgraph VM ["Ubuntu 24.04 LTS VM (Standard_B2ls_v2)"]
-                    
-                    subgraph Edge ["Nginx Reverse Proxy (Ports 80 & 443)"]
-                        Certbot["Certbot TLS 1.3<br/>(Let's Encrypt Auto-Renewal)"]
-                        Nginx["Nginx Web Server"]
-                    end
+    subgraph HostVM ["Azure Ubuntu 24.04 LTS VM - Standard_B2ls_v2 in Central India"]
+        subgraph Edge ["Edge Layer - Nginx"]
+            Certbot["Certbot TLS 1.3 Auto-Renewal"]
+            Nginx["Nginx Reverse Proxy - Ports 80 and 443"]
+        end
 
-                    subgraph AppServices ["Systemd Managed Daemons"]
-                        APIService["apidash-api.service<br/>(Node.js API, 127.0.0.1:5000)"]
-                        WorkerService["apidash-worker.service<br/>(Background Worker Daemon)"]
-                        BackupTimer["apidash-backup.timer<br/>(Nightly 02:00 UTC MySQL Dumps)"]
-                    end
+        subgraph AppServices ["Systemd Managed Daemons"]
+            APIService["apidash-api.service - Node.js API 127.0.0.1:5000"]
+            WorkerService["apidash-worker.service - Background Worker Daemon"]
+            BackupTimer["apidash-backup.timer - Nightly 02:00 UTC MySQL Dumps"]
+        end
 
-                    subgraph DBEngine ["Local Storage & Database"]
-                        MySQL["MySQL 8.0 Engine<br/>(127.0.0.1:3306)"]
-                        Storage["Local NVMe OS Disk<br/>(/opt/apidash & /var/backups)"]
-                    end
-                end
-            end
+        subgraph DBEngine ["Local Storage and Database"]
+            MySQL[("MySQL 8.0 Engine - 127.0.0.1:3306")]
+            Storage["Local NVMe OS Disk - /opt/apidash and /var/backups"]
         end
     end
 
     Internet["Public Internet / Client Browser"] -->|Port 443 HTTPS| Nginx
-    Internet -->|Port 80 HTTP (Redirected)| Nginx
-    Nginx -->|Reverse Proxy /api/ & static frontend| APIService
+    Internet -->|Port 80 HTTP Redirected| Nginx
+    Nginx -->|Reverse Proxy /api/ and static frontend| APIService
     Nginx -->|Serves Static Files directly| Storage
 
     APIService -->|Loopback TCP| MySQL
@@ -148,3 +141,4 @@ WantedBy=multi-user.target
 Sensitive configuration values are isolated from the Git repository and stored strictly on the VM filesystem:
 * `/etc/apidash/db.env` (Permissions `0600`, owned by `azureuser`): Contains `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`.
 * `/etc/apidash/app.env` (Permissions `0600`, owned by `azureuser`): Contains `PORT`, `NODE_ENV=production`, `SESSION_SECRET`, `SMTP_*` credentials, and optional `AI_*` inference tokens.
+

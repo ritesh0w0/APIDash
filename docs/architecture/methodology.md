@@ -8,22 +8,22 @@ APIDash governs API quality through an end-to-end, multi-stage operational lifec
 
 ```mermaid
 flowchart TD
-    A["1. Input & Configuration<br/>(User specifies URL, headers, intervals, assertions, contracts)"] --> B["2. Scheduler Lease Acquisition<br/>(Worker claims due monitors via atomic DB transaction)"]
-    B --> C["3. Egress Security & Pre-Flight<br/>(DNS resolution, SSRF validation, IP socket pinning)"]
-    C --> D["4. Network Probe Execution<br/>(HTTP/S dispatch, latency capture, body truncation)"]
-    D --> E["5. Canonical Outcome Determination<br/>(Status evaluation, multi-rule assertions, contract validation)"]
-    E --> F["6. Telemetry & Metrics Persistence<br/>(Atomic write to test_results and rollup aggregation)"]
-    F --> G{"7. State Transition Check<br/>(Consecutive pass/fail counter evaluation)"}
+    A["1. Input and Configuration<br/>User specifies URL, headers, intervals, assertions"] --> B["2. Scheduler Lease Acquisition<br/>Worker claims due monitors via atomic DB transaction"]
+    B --> C["3. Egress Security and Pre-Flight<br/>DNS resolution, SSRF validation, IP socket pinning"]
+    C --> D["4. Network Probe Execution<br/>HTTP/S dispatch, latency capture, body truncation"]
+    D --> E["5. Canonical Outcome Determination<br/>Status evaluation, multi-rule assertions, contract validation"]
+    E --> F["6. Telemetry and Metrics Persistence<br/>Atomic write to test_results and rollup aggregation"]
+    F --> G{"7. State Transition Check<br/>Consecutive pass/fail counter evaluation"}
     
-    G -->|>= 2 Failures| H["8a. Incident Opened / Updated<br/>(Durable outbox entry + AI job queued)"]
-    G -->|>= 2 Passes| I["8b. Incident Resolved<br/>(Resolution outbox entry generated)"]
-    G -->|Stable / Threshold Not Met| J["8c. No State Change"]
+    G -->|Two or More Consecutive Failures| H["8a. Incident Opened or Updated<br/>Durable outbox entry and AI job queued"]
+    G -->|Two or More Consecutive Passes| I["8b. Incident Resolved<br/>Resolution outbox entry generated"]
+    G -->|Stable or Threshold Not Met| J["8c. No State Change"]
 
-    H --> K["9. Asynchronous Outbox Dispatch<br/>(SMTP worker delivers email alerts to authorized recipients)"]
-    H --> L["10. Asynchronous AI Investigation<br/>(Diagnostic evidence packaged & analyzed out-of-band)"]
+    H --> K["9. Asynchronous Outbox Dispatch<br/>SMTP worker delivers email alerts to authorized recipients"]
+    H --> L["10. Asynchronous AI Investigation<br/>Diagnostic evidence packaged and analyzed out-of-band"]
     I --> K
 
-    F --> M["11. Real-Time Analytics & UI Visualization<br/>(Chart.js latency percentiles, uptime, incident timeline)"]
+    F --> M["11. Real-Time Analytics and UI Visualization<br/>Chart.js latency percentiles, uptime, incident timeline"]
 ```
 
 ---
@@ -70,3 +70,4 @@ The run result is synthesized into one of three canonical outcomes:
 
 ### Stage 11: Real-Time Visualization
 * The user interface renders latency percentiles ($p_{50}, p_{90}, p_{99}$), uptime ratios, incident timelines, and contract validation status in responsive Chart.js widgets.
+

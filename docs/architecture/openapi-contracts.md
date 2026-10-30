@@ -9,23 +9,23 @@ APIDash elevates conventional HTTP monitoring into **Contract-Driven Quality Ass
 ```mermaid
 graph TB
     subgraph Ingestion ["Contract Ingestion"]
-        Upload["OpenAPI 3.0 / 3.1 Spec (JSON or YAML)"] --> Parser["Scalar OpenAPI Parser Service"]
-        Parser --> Deref["Schema Dereferencing & Validation"]
-        Deref --> Storage["contract_specifications & contract_revisions"]
+        Upload["OpenAPI 3.0 / 3.1 Spec - JSON or YAML"] --> Parser["Scalar OpenAPI Parser Service"]
+        Parser --> Deref["Schema Dereferencing and Validation"]
+        Deref --> Storage["contract_specifications and contract_revisions"]
     end
 
     subgraph Binding ["Operation Binding"]
-        Storage --> Ops["contract_operations<br/>(Extracted Paths, Methods, Schemas)"]
-        Ops --> Bind["contract_bindings<br/>(Maps Monitor to Operation)"]
+        Storage --> Ops["contract_operations<br/>Extracted Paths, Methods, Schemas"]
+        Ops --> Bind["contract_bindings<br/>Maps Monitor to Operation"]
     end
 
     subgraph RuntimeValidation ["Runtime Execution Validation"]
         Probe["Probe Response Payload"] --> Validator["Contract Validator Service"]
         Bind --> Validator
-        Validator --> AJV["AJV Schema Engine<br/>(ajv + ajv-formats)"]
+        Validator --> AJV["AJV Schema Engine<br/>ajv and ajv-formats"]
         AJV --> Outcome{"Schema Compliance?"}
         Outcome -->|Pass| PassResult["Canonical PASSED"]
-        Outcome -->|Violation| Drift["Contract Drift Detected<br/>(Canonical FAILED + Detailed Diff)"]
+        Outcome -->|Violation| Drift["Contract Drift Detected<br/>Canonical FAILED and Detailed Diff"]
     end
 ```
 
@@ -74,3 +74,4 @@ Contracts are versioned via the `contract_revisions` table:
 * Updating an OpenAPI document creates an incremental revision (`v1`, `v2`, etc.).
 * Monitors maintain an explicit binding to either the latest active revision or a pinned historical version.
 * Drift reports highlight historical deviations, providing engineering teams with concrete evidence when third-party microservices silently deploy breaking changes.
+

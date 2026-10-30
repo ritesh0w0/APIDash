@@ -87,12 +87,12 @@ To guarantee 100% testability and prevent port conflicts during integration test
 ```mermaid
 graph LR
     subgraph Ingestion ["1. Route Layer"]
-        Router["Express Router<br/>(e.g., apiRoutes.js)"]
+        Router["Express Router<br/>apiRoutes.js"]
     end
 
     subgraph Security ["2. Middleware Layer"]
-        AuthMid["authMiddleware<br/>(Session & Workspace Guard)"]
-        CSRFMid["csrfProtection<br/>(Double-Submit Header)"]
+        AuthMid["authMiddleware<br/>Session and Workspace Guard"]
+        CSRFMid["csrfProtection<br/>Double-Submit Header"]
     end
 
     subgraph Domain ["3. Service Layer"]
@@ -110,6 +110,9 @@ graph LR
     Security --> Domain
     Domain --> Persistence
 ```
+    Domain --> Persistence
+```
 
 ### Dependency Injection & Mockability
 Domain services accept repository dependencies or connection pools via function arguments or constructor parameters, allowing unit and integration tests to replace real database operations with fast in-memory stubs or transaction-isolated test fixtures.
+

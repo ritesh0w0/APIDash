@@ -14,29 +14,29 @@ All Phase 2 workspace authorization and SSRF protections, as well as the Phase 3
 
 ```mermaid
 flowchart TD
-    subgraph API_Process["Express API Server Process (npm start)"]
-        Client[Frontend / API Clients] -->|HTTP / CSRF / Session| Routes[API & Workspace Routes]
-        Routes -->|Manual Probe Trigger| CoordManual[Phase 3 Run Coordinator\nmonitoringCoordinator.js]
-        Routes -->|Query Health & Stats| DB_Read[(MySQL Database)]
+    subgraph API_Process ["Express API Server Process - npm start"]
+        Client["Frontend / API Clients"] -->|HTTP / CSRF / Session| Routes["API and Workspace Routes"]
+        Routes -->|Manual Probe Trigger| CoordManual["Phase 3 Run Coordinator<br/>monitoringCoordinator.js"]
+        Routes -->|Query Health and Stats| DB_Read[("MySQL Database")]
     end
 
-    subgraph Worker_Processes["Dedicated Worker Processes (npm run worker)"]
-        Worker1[Worker Process 1] -->|Atomic Claim\nFOR UPDATE SKIP LOCKED| ScheduleTable[(monitor_schedules Table)]
-        Worker2[Worker Process 2] -->|Atomic Claim\nFOR UPDATE SKIP LOCKED| ScheduleTable
+    subgraph Worker_Processes ["Dedicated Worker Processes - npm run worker"]
+        Worker1["Worker Process 1"] -->|Atomic Claim - FOR UPDATE SKIP LOCKED| ScheduleTable[("monitor_schedules Table")]
+        Worker2["Worker Process 2"] -->|Atomic Claim - FOR UPDATE SKIP LOCKED| ScheduleTable
 
-        Worker1 -->|Bounded Concurrency Slot| CoordSched1[Phase 3 Run Coordinator\nmonitoringCoordinator.js]
-        Worker2 -->|Bounded Concurrency Slot| CoordSched2[Phase 3 Run Coordinator\nmonitoringCoordinator.js]
+        Worker1 -->|Bounded Concurrency Slot| CoordSched1["Phase 3 Run Coordinator<br/>monitoringCoordinator.js"]
+        Worker2 -->|Bounded Concurrency Slot| CoordSched2["Phase 3 Run Coordinator<br/>monitoringCoordinator.js"]
 
-        CoordSched1 -->|SSRF-Protected Request| Targets[Target Endpoints]
+        CoordSched1 -->|SSRF-Protected Request| Targets["Target Endpoints"]
         CoordSched2 -->|SSRF-Protected Request| Targets
 
-        CoordSched1 -->|Persist Test Results| TestResultsTable[(test_results Table)]
+        CoordSched1 -->|Persist Test Results| TestResultsTable[("test_results Table")]
         CoordSched2 -->|Persist Test Results| TestResultsTable
 
-        CoordSched1 -->|Complete Claim &\nAdvance Schedule| ScheduleTable
-        CoordSched2 -->|Complete Claim &\nAdvance Schedule| ScheduleTable
+        CoordSched1 -->|Complete Claim and Advance Schedule| ScheduleTable
+        CoordSched2 -->|Complete Claim and Advance Schedule| ScheduleTable
 
-        Worker1 -->|Flush Execution Batches| RunsTable[(scheduler_runs Table)]
+        Worker1 -->|Flush Execution Batches| RunsTable[("scheduler_runs Table")]
         Worker2 -->|Flush Execution Batches| RunsTable
     end
 ```

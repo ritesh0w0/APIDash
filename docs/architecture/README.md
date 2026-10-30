@@ -33,34 +33,34 @@ This documentation suite provides a deep, component-level architectural breakdow
 ```mermaid
 graph TB
     subgraph Client ["Client Browser"]
-        SPA["Vanilla JS SPA<br/>(Dashboard, Analytics, Incidents, Contracts)"]
+        SPA["Vanilla JS SPA<br/>Dashboard, Analytics, Incidents"]
     end
 
-    subgraph Edge ["Edge Layer (Azure VM)"]
-        Nginx["Nginx Reverse Proxy<br/>TLS Termination (Let's Encrypt)<br/>Port 80/443 with HSTS"]
+    subgraph Edge ["Edge Layer - Azure VM"]
+        Nginx["Nginx Reverse Proxy<br/>TLS Termination - Let's Encrypt<br/>Port 80/443 with HSTS"]
     end
 
     subgraph Application ["APIDash Core Processes"]
-        API["Node.js / Express API Server<br/>(127.0.0.1:5000)<br/>systemd: apidash-api.service"]
-        Worker["Dedicated Background Worker<br/>(Scheduler, Outbox, AI Worker)<br/>systemd: apidash-worker.service"]
+        API["Node.js Express API Server<br/>127.0.0.1:5000<br/>systemd: apidash-api.service"]
+        Worker["Dedicated Background Worker<br/>Scheduler, Outbox, AI Worker<br/>systemd: apidash-worker.service"]
     end
 
     subgraph DataStore ["Persistence Layer"]
-        MySQL[("MySQL 8.0 Engine<br/>20 Relational Tables<br/>InnoDB with Row-Level Locking")]
+        MySQL[("MySQL 8.0 Engine<br/>20 Relational Tables<br/>InnoDB Row-Level Locking")]
     end
 
-    subgraph External ["External Services & Targets"]
-        Targets["Monitored Target APIs<br/>(HTTP/HTTPS Endpoints)"]
-        SMTP["Gmail SMTP Relay<br/>(smtp.gmail.com:587)"]
-        LLM["AI Providers<br/>(Groq / OpenRouter API)"]
+    subgraph External ["External Services and Targets"]
+        Targets["Monitored Target APIs<br/>HTTP/HTTPS Endpoints"]
+        SMTP["Gmail SMTP Relay<br/>smtp.gmail.com:587"]
+        LLM["AI Providers<br/>Groq / OpenRouter API"]
     end
 
-    SPA -->|HTTPS / WSS| Nginx
+    SPA -->|HTTPS or WSS| Nginx
     Nginx -->|Static Assets| SPA
     Nginx -->|Proxy Pass 127.0.0.1:5000| API
 
-    API -->|Session & Business Data| MySQL
-    Worker -->|Claim Leases & Record Results| MySQL
+    API -->|Session and Business Data| MySQL
+    Worker -->|Claim Leases and Record Results| MySQL
 
     API -.->|Instant Manual Run| Targets
     Worker -->|Scheduled Health Probes| Targets
@@ -77,3 +77,4 @@ graph TB
 3. **Defense-in-Depth:** Every layer enforces defensive programming — SSRF socket pinning, multi-tenant IDOR checks, CSRF validation, and strict database transactions.
 4. **Resilient Outbox & Leases:** All asynchronous side effects (email alerts, AI analyses) are transactionally recorded in durable database outboxes with monotonic leases, preventing duplicate executions and lost messages.
 5. **Zero Vendor Lock-In:** Standard Node.js, standard MySQL, vanilla DOM manipulation, and raw systemd daemons on Linux ensure effortless portability across cloud providers.
+

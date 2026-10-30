@@ -8,49 +8,54 @@ APIDash is architectured as a **Modular Monolith** with decoupled runtime execut
 
 ```mermaid
 graph TB
-    subgraph ClientTier ["Presentation Tier (Browser)"]
-        SPA["Vanilla JavaScript SPA<br/>(DOM Controllers, Chart.js, Modals)"]
+    subgraph ClientTier ["Presentation Tier - Browser"]
+        SPA["Vanilla JavaScript SPA<br/>DOM Controllers, Chart.js, Modals"]
     end
 
-    subgraph APITier ["Web & API Tier (Process 1)"]
-        Server["Express App Factory (server.js / app.js)"]
-        AuthRouter["Auth Router (/api/auth)"]
-        WorkspaceRouter["Workspace Router (/api/workspaces)"]
-        MonitorRouter["Monitor Router (/api/monitors)"]
-        ContractRouter["Contract Router (/api/contracts)"]
-        IncidentRouter["Incident Router (/api/incidents)"]
-        AnalyticsRouter["Analytics Router (/api/analytics)"]
+    subgraph APITier ["Web and API Tier - Process 1"]
+        Server["Express App Factory - app.js"]
+        AuthRouter["Auth Router - /api/auth"]
+        WorkspaceRouter["Workspace Router - /api/workspaces"]
+        MonitorRouter["Monitor Router - /api/monitors"]
+        ContractRouter["Contract Router - /api/contracts"]
+        IncidentRouter["Incident Router - /api/incidents"]
+        AnalyticsRouter["Analytics Router - /api/analytics"]
     end
 
     subgraph ServiceTier ["Core Domain Services"]
         CoordService["Monitoring Coordinator"]
-        ExecService["Probe Executor (Axios + Pinning)"]
+        ExecService["Probe Executor - Axios and Pinning"]
         AssertService["Assertion Engine"]
-        ContractService["Contract Validation Service (AJV)"]
-        IncService["Incident Service (State Machine)"]
+        ContractService["Contract Validation Service - AJV"]
+        IncService["Incident Service - State Machine"]
         OutboxService["Notification Outbox Service"]
     end
 
-    subgraph WorkerTier ["Background Processing Tier (Process 2)"]
-        WorkerProc["Worker Daemon (worker.js)"]
-        SchedLoop["Scheduler Loop (30s Cadence)"]
-        OutboxLoop["Notification Dispatcher Loop (1s Loop)"]
-        AILoop["AI Investigation Worker (2s Loop)"]
+    subgraph WorkerTier ["Background Processing Tier - Process 2"]
+        WorkerProc["Worker Daemon - worker.js"]
+        SchedLoop["Scheduler Loop - 30s Cadence"]
+        OutboxLoop["Notification Dispatcher Loop - 1s Loop"]
+        AILoop["AI Investigation Worker - 2s Loop"]
     end
 
-    subgraph PersistenceTier ["Persistence Tier (MySQL 8.0)"]
+    subgraph PersistenceTier ["Persistence Tier - MySQL 8.0"]
         DB[(MySQL Database)]
         Sessions[("sessions")]
-        Users[("users & workspaces")]
-        Monitors[("api_monitors & schedules")]
-        Results[("test_results & metrics")]
-        Incidents[("incidents & events")]
+        Users[("users and workspaces")]
+        Monitors[("api_monitors and schedules")]
+        Results[("test_results and metrics")]
+        Incidents[("incidents and events")]
         Outbox[("notification_outbox")]
         AIJobs[("incident_ai_analyses")]
     end
 
     SPA -->|RESTful Calls + Cookie| Server
-    Server --> AuthRouter & WorkspaceRouter & MonitorRouter & ContractRouter & IncidentRouter & AnalyticsRouter
+    Server --> AuthRouter
+    Server --> WorkspaceRouter
+    Server --> MonitorRouter
+    Server --> ContractRouter
+    Server --> IncidentRouter
+    Server --> AnalyticsRouter
 
     MonitorRouter --> CoordService
     CoordService --> ExecService
@@ -58,13 +63,20 @@ graph TB
     ExecService --> ContractService
     CoordService --> IncService
 
-    WorkerProc --> SchedLoop & OutboxLoop & AILoop
+    WorkerProc --> SchedLoop
+    WorkerProc --> OutboxLoop
+    WorkerProc --> AILoop
     SchedLoop --> CoordService
     OutboxLoop --> OutboxService
 
-    AuthRouter & WorkspaceRouter --> Users & Sessions
-    MonitorRouter & SchedLoop --> Monitors & Results
-    IncService --> Incidents & Outbox
+    AuthRouter --> Users
+    AuthRouter --> Sessions
+    WorkspaceRouter --> Users
+    MonitorRouter --> Monitors
+    SchedLoop --> Monitors
+    CoordService --> Results
+    IncService --> Incidents
+    IncService --> Outbox
     AILoop --> AIJobs
 ```
 
@@ -83,25 +95,25 @@ A fundamental architectural constraint of APIDash is that the **API server proce
 sequenceDiagram
     autonumber
     participant UI as User Browser
-    participant API as API Server (server.js)
+    participant API as Express API Server
     participant DB as MySQL Database
-    participant W as Worker Daemon (worker.js)
+    participant W as Background Worker Daemon
     participant Ext as External Target API
 
     Note over API,W: API and Worker share ONLY the MySQL Database
-    UI->>API: POST /api/monitors/:id/run (Manual Instant Run)
-    API->>Ext: Safe HTTP Probe (Pinned Socket)
+    UI->>API: POST /api/monitors/:id/run - Manual Instant Run
+    API->>Ext: Safe HTTP Probe - Pinned Socket
     Ext-->>API: HTTP Response
     API->>DB: INSERT test_results
-    API-->>UI: 200 OK (Run Results)
+    API-->>UI: 200 OK - Run Results
 
     Note over W: Worker runs independently via systemd
     loop Every 30 Seconds
-        W->>DB: Claim due monitor schedules (SELECT ... FOR UPDATE)
-        W->>Ext: Scheduled HTTP Probe (Pinned Socket)
+        W->>DB: Claim due monitor schedules - SELECT FOR UPDATE
+        W->>Ext: Scheduled HTTP Probe - Pinned Socket
         Ext-->>W: HTTP Response
         W->>DB: INSERT test_results
-        W->>DB: Advance schedule & release claim
+        W->>DB: Advance schedule and release claim
     end
 ```
 
@@ -127,3 +139,4 @@ Because both the API server and Worker daemon interact with the same database, c
 
 * **Worker Leases:** When the worker claims due monitors or pending notification jobs, it uses `NOW()`-based lease tokens and update timestamps. If a worker node crashes mid-execution, orphaned jobs automatically expire and are reclaimed by the next loop iteration.
 * **Idempotency:** Test result insertion generates immutable historical records (`test_results`). Downstream updates to monitor rollups (`api_monitors.last_status`, `consecutive_failures`) occur inside the same database transaction.
+

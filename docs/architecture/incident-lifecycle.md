@@ -20,16 +20,16 @@ stateDiagram-v2
         FirstFailure --> NoFailures: Next run PASSED
     }
 
-    HEALTHY --> INCIDENT_OPEN: Failure 2 detected (Consecutive Failures = 2)
+    HEALTHY --> INCIDENT_OPEN: Failure 2 detected - Consecutive Failures reaches 2
 
     state INCIDENT_OPEN {
         [*] --> ActiveIncident
-        ActiveIncident --> ActiveIncident: Subsequent Failures (Increment counter)
-        ActiveIncident --> FirstPass: First Pass detected (Consecutive Passes = 1)
-        FirstPass --> ActiveIncident: Next run FAILED (Counter resets to 0)
+        ActiveIncident --> ActiveIncident: Subsequent Failures - Increment counter
+        ActiveIncident --> FirstPass: First Pass detected - Consecutive Passes reaches 1
+        FirstPass --> ActiveIncident: Next run FAILED - Counter resets to 0
     }
 
-    INCIDENT_OPEN --> INCIDENT_RESOLVED: Pass 2 detected (Consecutive Passes = 2)
+    INCIDENT_OPEN --> INCIDENT_RESOLVED: Pass 2 detected - Consecutive Passes reaches 2
     INCIDENT_RESOLVED --> HEALTHY: State reset to baseline
 ```
 
@@ -64,3 +64,4 @@ Every incident maintains an immutable audit log in `incident_events`:
 * **`OPENED`:** Captures opening HTTP status, failed assertion details, and error messages.
 * **`ANALYSIS_ATTACHED`:** Records the completion of an asynchronous AI root cause analysis.
 * **`RESOLVED`:** Records the exact timestamp, recovery latency, and passing assertion response that confirmed service restoration.
+

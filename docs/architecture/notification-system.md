@@ -47,11 +47,11 @@ To prevent workspace users from entering arbitrary external email addresses (whi
 
 ```mermaid
 graph TD
-    UI["Workspace Notification Settings"] -->|PUT /api/workspaces/:id/notification-settings| Route["workspaceRoutes.js"]
+    UI["Workspace Notification Settings"] -->|PUT notification-settings| Route["workspaceRoutes.js"]
     Route --> AuthCheck{"1. Is Caller Workspace Owner?"}
     AuthCheck -->|No| Reject403["403 Forbidden"]
     AuthCheck -->|Yes| MemberCheck{"2. Are all recipient_user_ids<br/>active members of this workspace?"}
-    MemberCheck -->|Contains Invalid/External ID| Reject400["400 Bad Request<br/>(Unauthorized Recipient)"]
+    MemberCheck -->|Contains Invalid or External ID| Reject400["400 Bad Request<br/>Unauthorized Recipient"]
     MemberCheck -->|All IDs Valid| Save["Persist Settings in workspace_notification_settings"]
 ```
 
@@ -73,3 +73,4 @@ In the production deployment, emails are delivered through a dedicated Google Wo
 * **Port:** `587` (STARTTLS)
 * **Authentication:** App Password authentication (`ryyf lzwa xurh yatx`) associated with `apidash.alerts@gmail.com`.
 * **Security:** Enforces opportunistic TLS 1.3 encryption during transport.
+

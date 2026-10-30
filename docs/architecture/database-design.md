@@ -154,3 +154,4 @@ Database schema evolution is strictly version-controlled via sequential migratio
 * `029_...` through `031_...`: AI incident investigation jobs and diagnostic evidence schemas.
 
 Migrations execute idempotently using a transactional runner (`backend/scripts/migrate.js`) that locks `schema_migrations` before applying pending DDL scripts.
+

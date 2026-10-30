@@ -44,15 +44,15 @@ They frequently miss critical production failures:
 ```mermaid
 graph TB
     subgraph Client ["Client Presentation"]
-        SPA["Vanilla JavaScript SPA<br/>(DOM Controllers, Chart.js Analytics)"]
+        SPA["Vanilla JavaScript SPA<br/>DOM Controllers and Chart.js"]
     end
 
-    subgraph Edge ["Edge Layer (Azure VM)"]
-        Nginx["Nginx Reverse Proxy<br/>Port 80/443 (Let's Encrypt TLS)"]
+    subgraph Edge ["Edge Layer - Azure VM"]
+        Nginx["Nginx Reverse Proxy<br/>Port 80/443 Let's Encrypt TLS"]
     end
 
     subgraph Application ["APIDash Runtime Daemons"]
-        API["Express API Server (127.0.0.1:5000)<br/>systemd: apidash-api.service"]
+        API["Express API Server 127.0.0.1:5000<br/>systemd: apidash-api.service"]
         Worker["Dedicated Background Worker<br/>systemd: apidash-worker.service"]
     end
 
@@ -61,20 +61,20 @@ graph TB
     end
 
     subgraph External ["External Services"]
-        Targets["Monitored APIs (HTTP/S)"]
-        SMTP["Gmail SMTP Relay (Port 587)"]
-        LLM["AI Providers (Groq / OpenRouter)"]
+        Targets["Monitored APIs - HTTP/S"]
+        SMTP["Gmail SMTP Relay - Port 587"]
+        LLM["AI Providers - Groq / OpenRouter"]
     end
 
     SPA -->|HTTPS| Nginx
     Nginx -->|Static Assets| SPA
     Nginx -->|Proxy Pass| API
 
-    API -->|Session & Monitor State| MySQL
-    Worker -->|Claim Leases & Record Metrics| MySQL
+    API -->|Session and Monitor State| MySQL
+    Worker -->|Claim Leases and Record Metrics| MySQL
 
     API -.->|Ad-Hoc Manual Runs| Targets
-    Worker -->|Scheduled Probes (SSRF Pinned)| Targets
+    Worker -->|Scheduled Probes - SSRF Pinned| Targets
     Worker -->|Durable Outbox Dispatch| SMTP
     Worker -->|Asynchronous Root Cause Analysis| LLM
 ```

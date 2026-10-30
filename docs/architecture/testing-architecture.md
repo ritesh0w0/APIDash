@@ -7,12 +7,12 @@ Quality assurance in APIDash is enforced through a comprehensive, multi-tiered a
 ## 🏗️ Testing Pyramid & Test Distribution
 
 ```mermaid
-pie title Automated Test Distribution (250 Tests Total)
-    "Unit Tests (Assertion, SSRF, Parsers, Validation)" : 110
-    "Integration Tests (Routes, Auth, Contracts, DB)" : 65
-    "Concurrency & Worker Leases (Multi-worker, Schedules)" : 35
-    "AI Benchmark & Fallback Orchestration" : 25
-    "Production Regression Suites (Notification IDs, SYN-002)" : 15
+pie title Automated Test Distribution - 250 Tests Total
+    "Unit Tests - Assertion, SSRF, Parsers" : 110
+    "Integration Tests - Routes, Auth, Contracts" : 65
+    "Concurrency and Worker Leases" : 35
+    "AI Benchmark and Fallback Orchestration" : 25
+    "Production Regression Suites" : 15
 ```
 
 ---
@@ -72,3 +72,4 @@ npm test
 ℹ skipped 0
 ℹ duration_ms 55004
 ```
+

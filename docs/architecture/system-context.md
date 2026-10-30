@@ -9,23 +9,23 @@ The **System Context** view defines the high-level boundary of the APIDash platf
 ```mermaid
 graph TB
     subgraph Users ["Human Stakeholders"]
-        Owner["Workspace Owner<br/>(Administers monitors, members, alerts)"]
-        Member["Workspace Member<br/>(Views monitors, reviews incidents)"]
+        Owner["Workspace Owner<br/>Administers monitors, members, alerts"]
+        Member["Workspace Member<br/>Views monitors, reviews incidents"]
     end
 
     subgraph Boundaries ["APIDash System Boundary"]
-        APIDash["APIDash Platform<br/>(Web Application & Monitoring Daemon)"]
+        APIDash["APIDash Platform<br/>Web Application and Monitoring Daemon"]
     end
 
     subgraph ExternalTargets ["External Targets"]
-        PublicAPI["Public Third-Party APIs<br/>(e.g., Stripe, GitHub, JSONPlaceholder)"]
-        InternalAPI["Private Corporate Services<br/>(Monitored internal microservices)"]
+        PublicAPI["Public Third-Party APIs<br/>Stripe, GitHub, JSONPlaceholder"]
+        InternalAPI["Private Corporate Services<br/>Monitored internal microservices"]
     end
 
     subgraph ExternalServices ["External Infrastructure Services"]
-        MailServer["Email Delivery Service<br/>(Gmail SMTP Relay)"]
-        AIProvider["AI Inference Services<br/>(Groq API / OpenRouter API)"]
-        CloudDNS["Azure DNS Services<br/>(Microsoft Cloudapp Infrastructure)"]
+        MailServer["Email Delivery Service<br/>Gmail SMTP Relay"]
+        AIProvider["AI Inference Services<br/>Groq API / OpenRouter API"]
+        CloudDNS["Azure DNS Services<br/>Microsoft Cloudapp Infrastructure"]
     end
 
     Owner -->|Configures monitors, members, contracts via HTTPS| APIDash
@@ -59,19 +59,21 @@ The platform establishes four distinct trust boundaries:
 ```mermaid
 graph LR
     subgraph TB1 ["Trust Boundary 1: Client to Edge"]
-        Browser["User Browser"] -->|HTTPS (TLS 1.2/1.3)<br/>WAF & Nginx| Nginx["Nginx Reverse Proxy"]
+        Browser["User Browser"] -->|HTTPS TLS 1.2 and 1.3 via WAF and Nginx| Nginx["Nginx Reverse Proxy"]
     end
 
     subgraph TB2 ["Trust Boundary 2: Edge to App"]
-        Nginx -->|Loopback HTTP 127.0.0.1:5000| Express["Express API"]
+        Nginx -->|Loopback HTTP 127.0.0.1:5000| Express["Express API Server"]
     end
 
     subgraph TB3 ["Trust Boundary 3: App to Database"]
-        Express & Worker["Worker Daemon"] -->|Loopback TCP 127.0.0.1:3306| MySQL[("MySQL Engine")]
+        Express -->|Loopback TCP 127.0.0.1:3306| MySQL[("MySQL Engine")]
+        Worker["Worker Daemon"] -->|Loopback TCP 127.0.0.1:3306| MySQL
     end
 
     subgraph TB4 ["Trust Boundary 4: App to Untrusted Internet"]
-        Worker & Express -->|Egress Probes with IP Pinning| Internet["Untrusted Remote APIs"]
+        Worker -->|Egress Probes with IP Pinning| Internet["Untrusted Remote APIs"]
+        Express -->|Manual Egress Probes| Internet
     end
 ```
 
@@ -103,3 +105,4 @@ graph LR
   * **Server-Side Request Forgery (SSRF) Defense:** Custom agent validates DNS resolution before connection.
   * Rejects private IP ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`), and cloud metadata services (`169.254.169.254`).
   * **Socket Pinning:** Connection socket is pinned directly to the pre-validated IP address, eliminating DNS rebinding attacks (Time-of-Check to Time-of-Use race conditions).
+

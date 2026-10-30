@@ -15,18 +15,18 @@ sequenceDiagram
     autonumber
     participant Engine as Executor Service
     participant SSRF as SSRF Validator
-    participant DNS as Node.js DNS (dns.resolve)
+    participant DNS as Node.js DNS Resolver
     participant Agent as Custom http.Agent
     participant Remote as External API Server
 
     Engine->>SSRF: Validate URL Syntax
     SSRF-->>Engine: Syntax Validated
-    Engine->>DNS: Resolve Hostname to IP(s)
-    DNS-->>Engine: [192.0.2.1, 198.51.100.2]
+    Engine->>DNS: Resolve Hostname to IPs
+    DNS-->>Engine: IP 192.0.2.1 and 198.51.100.2
     Engine->>SSRF: Check IP against Blacklist
     Note over SSRF: Checks IPv4/IPv6 private ranges,<br/>loopback, link-local, cloud metadata
     SSRF-->>Engine: All IPs Approved
-    Engine->>Agent: Create Pinned Agent (Target IP: 192.0.2.1)
+    Engine->>Agent: Create Pinned Agent - Target IP 192.0.2.1
     Engine->>Remote: Dispatch HTTP Request via Pinned Socket
     Note over Remote: DNS cannot be re-bound during connection
     Remote-->>Engine: Response Received
@@ -76,3 +76,4 @@ The assertion engine (`backend/services/assertionEngine.js`) evaluates an array 
 
 ### Prototype Pollution Defense
 When evaluating nested JSON body expressions (e.g., `body.a.b.c`), paths containing dangerous prototype identifiers (`__proto__`, `constructor`, `prototype`) are rejected strictly before resolution, preventing object prototype manipulation.
+

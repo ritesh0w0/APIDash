@@ -8,24 +8,24 @@ The APIDash user interface is constructed using a **Zero-Framework Vanilla JavaS
 
 ```mermaid
 graph TB
-    subgraph BrowserRuntime ["Browser Runtime (HTML5 / ES6+)"]
-        DOM["DOM Tree (index.html)"]
-        AppController["Application State Controller (app.js)"]
+    subgraph BrowserRuntime ["Browser Runtime - HTML5 and ES6"]
+        DOM["DOM Tree - index.html"]
+        AppController["Application State Controller - app.js"]
         ChartEngine["Chart.js Analytics Engine"]
-        ModalManager["Modal & Dialog Manager"]
-        APIClient["Native Fetch Client (CSRF + Credentials)"]
+        ModalManager["Modal and Dialog Manager"]
+        APIClient["Native Fetch Client - CSRF and Credentials"]
     end
 
     subgraph BackendAPI ["Express API Gateway"]
-        Endpoints["REST API (/api/...)"]
+        Endpoints["REST API Endpoints - /api"]
     end
 
-    DOM -->|User Interactions (Clicks, Inputs)| AppController
+    DOM -->|User Interactions - Clicks and Inputs| AppController
     AppController -->|State Mutations| DOM
     AppController -->|Renders Visualizations| ChartEngine
-    AppController -->|Opens / Closes Modals| ModalManager
+    AppController -->|Opens and Closes Modals| ModalManager
     AppController -->|Issues AJAX Requests| APIClient
-    APIClient -->|JSON Payloads + x-csrf-token| Endpoints
+    APIClient -->|JSON Payloads and x-csrf-token| Endpoints
 ```
 
 ---
@@ -64,3 +64,4 @@ The UI features a clean modal management system:
 * **Modern Dark Theme:** Styled with a modern, high-contrast dark aesthetic tailored for developer dashboards and network operations centers (NOC).
 * **CSS Grid & Flexbox:** Fully fluid layout adapting dynamically from 4K ultrawide displays down to mobile viewports without layout distortion.
 * **Zero CSS Framework Overhead:** Pure CSS3 with CSS Custom Properties (variables) for theme consistency, avoiding bloated frameworks like Bootstrap or Tailwind.
+

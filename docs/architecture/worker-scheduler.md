@@ -13,16 +13,16 @@ sequenceDiagram
     autonumber
     participant W1 as Worker Node 1
     participant W2 as Worker Node 2
-    participant DB as MySQL (schedules table)
+    participant DB as MySQL Schedules Table
 
-    W1->>DB: SELECT id FROM schedules WHERE next_run_at <= NOW()<br/>AND (claimed_at IS NULL OR claimed_at < NOW() - INTERVAL 120s)<br/>LIMIT 10 FOR UPDATE SKIP LOCKED;
+    W1->>DB: SELECT id FROM schedules WHERE next_run_at <= NOW() FOR UPDATE SKIP LOCKED
     Note over DB: Locks claimed rows; W2 skips them
-    W2->>DB: SELECT id FROM schedules ... FOR UPDATE SKIP LOCKED;
+    W2->>DB: SELECT id FROM schedules ... FOR UPDATE SKIP LOCKED
     Note over W2: W2 claims next available rows or sleeps
 
-    W1->>DB: UPDATE schedules SET claimed_at = NOW(), claimed_by = 'w1-uuid' WHERE id IN (...)
+    W1->>DB: UPDATE schedules SET claimed_at = NOW(), claimed_by = worker-1
     W1->>W1: Execute Monitoring Probes in parallel
-    W1->>DB: UPDATE schedules SET next_run_at = NOW() + INTERVAL frequency_seconds, claimed_at = NULL WHERE id IN (...)
+    W1->>DB: UPDATE schedules SET next_run_at = NOW() + frequency, claimed_at = NULL
 ```
 
 ### 1. `FOR UPDATE SKIP LOCKED`
@@ -76,11 +76,12 @@ When the systemd service stops (`systemctl stop apidash-worker`) or receives `SI
 
 ```mermaid
 flowchart TD
-    A["SIGTERM / SIGINT Signal Received"] --> B["1. Set isShuttingDown = true<br/>(Halt new lease acquisitions)"]
-    B --> C["2. Wait for In-Flight Probes to Finish<br/>(Drain active promise pool with 10s budget)"]
-    C --> D["3. Release Incomplete Leases<br/>(Reset claimed_at to NULL for interrupted jobs)"]
+    A["SIGTERM or SIGINT Signal Received"] --> B["1. Set isShuttingDown = true<br/>Halt new lease acquisitions"]
+    B --> C["2. Wait for In-Flight Probes to Finish<br/>Drain active promise pool with 10s budget"]
+    C --> D["3. Release Incomplete Leases<br/>Reset claimed_at to NULL for interrupted jobs"]
     D --> E["4. Close MySQL Connection Pool Cleanly"]
     E --> F["5. Process Exits with Code 0"]
 ```
 
 This sequence prevents data corruption, ensures no network sockets are abruptly dropped, and guarantees that orphaned leases are cleanly released rather than waiting for timeout expiration.
+

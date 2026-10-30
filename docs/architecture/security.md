@@ -34,7 +34,7 @@ sequenceDiagram
     autonumber
     participant Browser as Client Browser
     participant API as Express API Server
-    participant DB as MySQL (sessions table)
+    participant DB as MySQL Sessions Table
 
     Note over Browser,API: 1. Authentication Handshake
     Browser->>API: POST /api/auth/login (email, password)
@@ -42,7 +42,7 @@ sequenceDiagram
     API->>DB: INSERT session (user_id, session_id, expires)
     API-->>Browser: Set-Cookie: connect.sid=s%3A...; HttpOnly; Secure; SameSite=Lax<br/>Set-Cookie: XSRF-TOKEN=uuid; Path=/
     
-    Note over Browser,API: 2. State-Mutating Request (e.g. Create Monitor)
+    Note over Browser,API: 2. State-Mutating Request - Create Monitor
     Browser->>API: POST /api/monitors<br/>Header: x-csrf-token: uuid<br/>Cookie: connect.sid=...; XSRF-TOKEN=uuid
     API->>API: Validate csrfToken matches XSRF-TOKEN cookie
     API->>DB: Validate session in sessions table
@@ -67,3 +67,4 @@ APIDash implements strict workspace isolation:
    SELECT * FROM api_monitors WHERE id = ? AND workspace_id = ?;
    ```
    An authenticated user cannot read or mutate another workspace's monitors simply by guessing or iterating monitor IDs (Insecure Direct Object Reference).
+

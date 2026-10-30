@@ -18,16 +18,16 @@ Phase 3 divides monitoring execution into four distinct, loosely coupled layers:
 
 ```mermaid
 flowchart TD
-    Route[Express Route / Scheduler] -->|Authorized Monitor & Context| Coordinator[Run Coordinator\nbackend/services/monitoringCoordinator.js]
-    Coordinator -->|SSRF-Protected Call| Executor[HTTP Executor\nbackend/services/executor.js]
-    Executor -->|Socket Pinning & DNS Validation| SSRF[SSRF Protection Layer\nbackend/services/ssrfProtection.js]
-    SSRF -->|Bounded Outbound Request| Target[Target API Endpoint]
+    Route["Express Route or Scheduler"] -->|Authorized Monitor and Context| Coordinator["Run Coordinator<br/>monitoringCoordinator.js"]
+    Coordinator -->|SSRF-Protected Call| Executor["HTTP Executor<br/>executor.js"]
+    Executor -->|Socket Pinning and DNS Validation| SSRF["SSRF Protection Layer<br/>ssrfProtection.js"]
+    SSRF -->|Bounded Outbound Request| Target["Target API Endpoint"]
     Target -->|Bounded HTTP Response| SSRF
     SSRF -->|Status, Headers, Truncated Body| Executor
-    Executor -->|Structured Observation OR Classified Error| Coordinator
-    Coordinator -->|Observation + Configured Assertions| AssertionEngine[Pure Assertion Engine\nbackend/services/assertionEngine.js]
-    AssertionEngine -->|Pass/Fail, Expected, Actual, Explanation| Coordinator
-    Coordinator -->|Persist Outcome, Timings, & Assertions| Repo[Test Result Repository\nbackend/data/testResultRepository.js]
+    Executor -->|Structured Observation or Classified Error| Coordinator
+    Coordinator -->|Observation and Configured Assertions| AssertionEngine["Pure Assertion Engine<br/>assertionEngine.js"]
+    AssertionEngine -->|Pass or Fail Explanation| Coordinator
+    Coordinator -->|Persist Outcome, Timings, Assertions| Repo["Test Result Repository<br/>testResultRepository.js"]
     Coordinator -->|Return Unified Run Result| Route
 ```
 

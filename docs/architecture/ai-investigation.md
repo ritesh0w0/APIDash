@@ -13,29 +13,29 @@ APIDash incorporates an optional, out-of-band **AI Incident Investigation Subsys
 sequenceDiagram
     autonumber
     participant Inc as Incident Service
-    participant DB as MySQL (incident_ai_analyses)
-    participant Worker as AI Worker (worker.js)
+    participant DB as MySQL Incident AI Analyses
+    participant Worker as AI Worker Daemon
     participant Fallback as Fallback AI Provider
-    participant Primary as Primary LLM (Groq)
-    participant Secondary as Fallback LLM (OpenRouter)
+    participant Primary as Primary LLM Groq
+    participant Secondary as Fallback LLM OpenRouter
 
-    Inc->>DB: INSERT INTO incident_ai_analyses<br/>(incident_id, status='PENDING', evidence_package)
+    Inc->>DB: INSERT INTO incident_ai_analyses<br/>status PENDING with evidence package
     Note over Inc: Non-blocking; HTTP execution completes immediately
 
     loop Every 2 Seconds
-        Worker->>DB: Claim pending analysis job (lease acquisition)
+        Worker->>DB: Claim pending analysis job - lease acquisition
         Worker->>Fallback: analyzeIncident(evidencePackage)
         
         alt Primary Provider Succeeds
-            Fallback->>Primary: POST /chat/completions (Strict Schema)
+            Fallback->>Primary: POST /chat/completions - Strict Schema
             Primary-->>Fallback: Valid JSON Response with Citations
         else Primary Returns 429 / 5xx / Timeout
-            Fallback->>Secondary: POST /chat/completions (Fallback)
+            Fallback->>Secondary: POST /chat/completions - Fallback
             Secondary-->>Fallback: Valid JSON Response with Citations
         end
 
-        Worker->>Worker: Validate Response Schema & Verify Citations
-        Worker->>DB: UPDATE incident_ai_analyses<br/>SET status='COMPLETED', analysis_result=JSON
+        Worker->>Worker: Validate Response Schema and Verify Citations
+        Worker->>DB: UPDATE incident_ai_analyses<br/>SET status COMPLETED with JSON result
     end
 ```
 
@@ -78,3 +78,4 @@ Before telemetry is transmitted to any external AI provider:
 * Authorization headers (`Authorization`, `Proxy-Authorization`), session cookies, and API keys are scrubbed.
 * URL credentials (`https://user:pass@domain.com`) are stripped.
 * Payloads are bounded to strict token budgets to prevent token exhaustion and data leakage.
+
