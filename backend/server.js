@@ -1,55 +1,105 @@
 // backend/server.js
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+'use strict';
+
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config();
 
-const { initDB } = require('./db');
-const { testAllApis } = require('./services/tester');
-const apiRoutes = require('./routes/apiRoutes');
+const { createApp } = require('./app');
+const { loadConfig } = require('./config');
+const { closePool, pingDatabase } = require('./db');
+const { logger } = require('./logger');
 
-const app = express();
-const PORT = process.env.PORT || 5000;
-const SCHEDULER_INTERVAL_MS = 30_000; // 30 seconds
+let httpServer = null;
 
-// ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+/**
+ * Starts the HTTP server and optional transitional legacy scheduler.
+ *
+ * @param {Object} [overrideConfig]
+ * @returns {Promise<{ server: import('http').Server, app: import('express').Application }>}
+ */
+async function startServer(overrideConfig = null) {
+  const config = overrideConfig || loadConfig();
+  const app = createApp({ logger, config });
 
-// Serve the frontend
-app.use(express.static(path.join(__dirname, '..', 'frontend')));
-
-// ─── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api', apiRoutes);
-
-// Health probe
-app.get('/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
-
-// Fallback to frontend for any unmatched route
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
-});
-
-// ─── Bootstrap ────────────────────────────────────────────────────────────────
-(async () => {
+  // Verify database connectivity
   try {
-    await initDB();
+    await pingDatabase();
+    logger.info({ db: config.db.database, host: config.db.host }, 'Connected to MySQL database');
+  } catch (err) {
+    logger.error({ err: err.message }, 'Failed to connect to MySQL database at startup');
+    // Note: In development or during setup, we log the error. Depending on deployment mode,
+    // we continue or throw. For local dev setup before migrations, we let the server start.
+  }
 
-    app.listen(PORT, () => {
-      console.log(`🚀  API Health Monitor running on http://localhost:${PORT}`);
-      console.log(`📅  Scheduler: all APIs tested every ${SCHEDULER_INTERVAL_MS / 1000}s`);
+  const bindHost = process.env.HOST || '127.0.0.1';
+
+  return new Promise((resolve, reject) => {
+    httpServer = app.listen(config.port, bindHost, () => {
+      logger.info({ port: config.port, host: bindHost }, `🚀 API Health Monitor running on http://${bindHost}:${config.port}`);
+
+      // Legacy in-process scheduler retirement (Phase 4):
+      // The API server must never independently run periodic scheduling.
+      // Background monitoring is executed exclusively by the dedicated worker (`npm run worker`).
+      if (config.enableLegacyScheduler) {
+        logger.warn('DEPRECATED: ENABLE_LEGACY_SCHEDULER is deprecated and disabled in the API server. Scheduled monitoring runs exclusively in the dedicated background worker ("npm run worker").');
+      }
+
+      resolve({ server: httpServer, app });
     });
 
-    // ── 30-second scheduler ──────────────────────────────────────────────────
-    // Run once immediately, then every 30 s
-    setTimeout(async () => {
-      await testAllApis();
-      setInterval(testAllApis, SCHEDULER_INTERVAL_MS);
-    }, 2000); // 2-sec warm-up so the server is fully up before the first run
+    httpServer.on('error', (err) => {
+      logger.error({ err: err.message }, 'HTTP server error');
+      reject(err);
+    });
+  });
+}
 
-  } catch (err) {
+/**
+ * Gracefully stops the HTTP server, scheduler timers, and database connection pool.
+ */
+async function stopServer() {
+  if (httpServer) {
+    await new Promise((resolve) => {
+      httpServer.close(() => {
+        logger.info('HTTP server closed');
+        resolve();
+      });
+    });
+    httpServer = null;
+  }
+
+  await closePool();
+  logger.info('Database pool closed');
+}
+
+// Graceful shutdown process handlers
+function setupSignalHandlers() {
+  const shutdown = async (signal) => {
+    logger.info({ signal }, `Received ${signal}, shutting down gracefully...`);
+    try {
+      await stopServer();
+      process.exit(0);
+    } catch (err) {
+      logger.error({ err: err.message }, 'Error during shutdown');
+      process.exit(1);
+    }
+  };
+
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+// Direct-execution guard: only start when invoked directly, never on require()
+if (require.main === module) {
+  setupSignalHandlers();
+  startServer().catch((err) => {
     console.error('❌  Failed to start server:', err.message);
     process.exit(1);
-  }
-})();
+  });
+}
+
+module.exports = {
+  startServer,
+  stopServer,
+};

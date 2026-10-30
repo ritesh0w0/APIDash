@@ -1,98 +1,84 @@
 // backend/services/tester.js
-const axios = require('axios');
-const { pool } = require('../db');
+'use strict';
+
+const { testResultRepository } = require('../data/testResultRepository');
+const { apiRepository } = require('../data/apiRepository');
+const { schedulerRunRepository } = require('../data/schedulerRunRepository');
+const { executeMonitoringRun } = require('./monitoringCoordinator');
+const { logger: defaultLogger } = require('../logger');
 
 /**
- * Tests a single API by its database row object.
- * @param {Object} api - { id, name, url, method, expected_status }
- * @returns {Object} test result
+ * Tests a single API by delegating to the unified monitoring coordinator.
+ *
+ * @param {Object} api - { id, name, url, method, expected_status, ... }
+ * @param {Object} [deps]
+ * @returns {Promise<Object>} test result
  */
-async function testApi(api) {
-  const start = Date.now();
-  let result = {
-    api_id: api.id,
-    api_name: api.name,
-    url: api.url,
-    method: api.method.toUpperCase(),
-    expected_status: api.expected_status,
-    status_code: null,
-    response_time: null,
-    result: 'FAIL',
-    error_message: null,
-  };
-
-  try {
-    const response = await axios({
-      method: api.method.toLowerCase(),
-      url: api.url,
-      timeout: 10000,            // 10-second hard timeout
-      validateStatus: () => true, // don't throw on non-2xx
-    });
-
-    result.status_code = response.status;
-    result.response_time = Date.now() - start;
-    result.result = response.status === api.expected_status ? 'PASS' : 'FAIL';
-    if (result.result === 'FAIL') {
-      result.error_message = `Expected ${api.expected_status}, got ${response.status}`;
-    }
-  } catch (err) {
-    result.response_time = Date.now() - start;
-    result.error_message = err.message;
-  }
-
-  // Persist result
-  await pool.execute(
-    `INSERT INTO test_results
-       (api_id, status_code, response_time, result, error_message)
-     VALUES (?, ?, ?, ?, ?)`,
-    [
-      result.api_id,
-      result.status_code,
-      result.response_time,
-      result.result,
-      result.error_message,
-    ]
-  );
-
-  return result;
+async function testApi(api, deps = {}) {
+  const coordinatorFn = deps.coordinatorFn || executeMonitoringRun;
+  return coordinatorFn(api, deps);
 }
 
 /**
  * Fetches all APIs from the DB and tests each one.
- * Called by the scheduler every 30 seconds.
+ * Called by the scheduler.
+ *
+ * @param {Object} [deps]
+ * @param {import('../data/apiRepository').ApiRepository} [deps.apiRepo]
+ * @param {import('../data/schedulerRunRepository').SchedulerRunRepository} [deps.runRepo]
+ * @param {typeof testApi} [deps.testApiFn]
+ * @param {import('pino').Logger} [deps.logger]
  */
-async function testAllApis() {
-  const [rows] = await pool.execute('SELECT * FROM apis');
+async function testAllApis(deps = {}) {
+  const apiRepo = deps.apiRepo || apiRepository;
+  const runRepo = deps.runRepo || schedulerRunRepository;
+  const testFn = deps.testApiFn || ((api) => testApi(api, deps));
+  const log = deps.logger || defaultLogger;
+
+  const rows = await apiRepo.findAll();
   if (rows.length === 0) {
-    console.log('⏭  Scheduler: no APIs registered yet — skipping cycle');
-    return;
+    log.info('Scheduler: no APIs registered yet — skipping cycle');
+    return null;
   }
 
   const startCycle = Date.now();
-  console.log(`\n🔄  [${new Date().toLocaleTimeString()}] Scheduler running ${rows.length} API test(s)...`);
+  log.info(`Scheduler running ${rows.length} API test(s)...`);
 
-  const results = await Promise.all(rows.map(testApi));
+  const results = await Promise.all(rows.map(testFn));
 
-  // Summarise cycle
-  const passed  = results.filter(r => r.result === 'PASS').length;
-  const failed  = results.length - passed;
-  const times   = results.map(r => r.response_time).filter(t => t != null);
-  const avgMs   = times.length ? Math.round(times.reduce((s, t) => s + t, 0) / times.length) : null;
+  // Summarise cycle: both failed and error count as unhealthy/failed
+  const isPassed = (r) => r.result === 'PASS' || r.result === 'passed';
+  const passed = results.filter(isPassed).length;
+  const failed = results.length - passed;
+  const times = results.map((r) => r.response_time).filter((t) => t != null);
+  const avgMs = times.length ? Math.round(times.reduce((s, t) => s + t, 0) / times.length) : null;
 
   // Persist scheduler run summary
-  await pool.execute(
-    `INSERT INTO scheduler_runs (total, passed, failed, avg_ms) VALUES (?, ?, ?, ?)`,
-    [results.length, passed, failed, avgMs]
-  ).catch(err => console.warn('⚠  Could not log scheduler run:', err.message));
+  await runRepo.create({
+    total: results.length,
+    passed,
+    failed,
+    avg_ms: avgMs,
+  }).catch((err) => log.warn({ err: err.message }, 'Could not log scheduler run'));
 
-  // Console report
   const duration = Date.now() - startCycle;
-  results.forEach(r => {
-    const icon = r.result === 'PASS' ? '✅' : '❌';
+  results.forEach((r) => {
+    const icon = isPassed(r) ? '✅' : '❌';
     console.log(`  ${icon}  [${r.api_name}] ${r.result} | HTTP ${r.status_code ?? 'ERR'} | ${r.response_time ?? '?'}ms`);
   });
   console.log(`  ↳ Cycle complete in ${duration}ms — ${passed} passed, ${failed} failed | avg ${avgMs ?? '?'}ms`);
+
+  return {
+    total: results.length,
+    passed,
+    failed,
+    avg_ms: avgMs,
+    duration,
+    results,
+  };
 }
 
-module.exports = { testApi, testAllApis };
-
+module.exports = {
+  testApi,
+  testAllApis,
+};

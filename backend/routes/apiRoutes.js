@@ -1,192 +1,180 @@
 // backend/routes/apiRoutes.js
+'use strict';
+
 const express = require('express');
-const router = express.Router();
-const { pool } = require('../db');
-const { testApi } = require('../services/tester');
-const { getApiAnalytics, getGlobalAnalytics } = require('../services/analytics');
+const { apiRepository: defaultApiRepo } = require('../data/apiRepository');
+const { testResultRepository: defaultTestResultRepo } = require('../data/testResultRepository');
+const { schedulerRunRepository: defaultSchedulerRunRepo } = require('../data/schedulerRunRepository');
+const { workspaceRepository: defaultWorkspaceRepo } = require('../data/workspaceRepository');
+const { testApi: defaultTestApi } = require('../services/tester');
+const { getApiAnalytics: defaultGetApiAnalytics, getGlobalAnalytics: defaultGetGlobalAnalytics } = require('../services/analytics');
+const { requireAuth: defaultRequireAuth } = require('../middleware/auth');
+const { asyncHandler, NotFoundError } = require('../middleware/errors');
+const { validateUrlSyntax } = require('../services/ssrfProtection');
+const { validateBody, createApiSchema } = require('../middleware/validation');
 
-// ─── POST /api/add ────────────────────────────────────────────────────────────
-router.post('/add', async (req, res) => {
-  try {
-    const { name, url, method = 'GET', expected_status = 200 } = req.body;
-    if (!name || !url) return res.status(400).json({ error: 'name and url are required' });
+/**
+ * Creates and configures the legacy compatibility API router.
+ * All operations are strictly authenticated and scoped to the user's workspace,
+ * preventing any anonymous access or cross-tenant authorization bypass.
+ *
+ * @param {Object} [deps]
+ * @returns {express.Router}
+ */
+function createApiRouter(deps = {}) {
+  const router = express.Router();
 
-    const validMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'];
-    const upperMethod = method.toUpperCase();
-    if (!validMethods.includes(upperMethod))
-      return res.status(400).json({ error: `method must be one of: ${validMethods.join(', ')}` });
+  const apiRepo = deps.apiRepo || defaultApiRepo;
+  const testResultRepo = deps.testResultRepo || defaultTestResultRepo;
+  const schedulerRunRepo = deps.schedulerRunRepo || defaultSchedulerRunRepo;
+  const workspaceRepo = deps.workspaceRepo || defaultWorkspaceRepo;
+  const testApiFn = deps.testApiFn || defaultTestApi;
+  const getApiAnalyticsFn = deps.getApiAnalyticsFn || defaultGetApiAnalytics;
+  const getGlobalAnalyticsFn = deps.getGlobalAnalyticsFn || defaultGetGlobalAnalytics;
+  const requireAuth = deps.requireAuth || defaultRequireAuth;
 
-    const [result] = await pool.execute(
-      'INSERT INTO apis (name, url, method, expected_status) VALUES (?, ?, ?, ?)',
-      [name, url, upperMethod, expected_status]
-    );
+  /**
+   * Helper to resolve the authenticated user's active/primary workspace.
+   */
+  async function resolveUserWorkspaceId(req) {
+    if (req.user && req.user.id) {
+      const workspaces = await workspaceRepo.findUserWorkspaces(req.user.id);
+      if (workspaces.length > 0) {
+        return workspaces[0].id;
+      }
+    }
+    return null;
+  }
+
+  // Enforce authentication on all legacy compatibility routes
+  router.use(requireAuth);
+
+  // Enforce workspace membership and resolve workspaceId for all legacy compatibility routes
+  router.use(asyncHandler(async (req, _res, next) => {
+    const workspaceId = await resolveUserWorkspaceId(req);
+    if (!workspaceId) {
+      throw new NotFoundError('No active workspace found for user');
+    }
+    req.workspaceId = workspaceId;
+    next();
+  }));
+
+  // ─── POST /api/add ────────────────────────────────────────────────────────────
+  router.post('/add', validateBody(createApiSchema), asyncHandler(async (req, res) => {
+    const { name, url, method, expected_status, headers, body, timeout_ms, assertions } = req.body;
+    validateUrlSyntax(url);
+
+    const createdApi = await apiRepo.create({
+      workspace_id: req.workspaceId,
+      name,
+      url,
+      method,
+      expected_status,
+      headers,
+      body,
+      timeout_ms,
+      assertions,
+    });
+
     return res.status(201).json({
       message: 'API added successfully',
-      api: { id: result.insertId, name, url, method: upperMethod, expected_status },
+      api: createdApi,
     });
-  } catch (err) {
-    console.error('POST /api/add error:', err.message);
-    return res.status(500).json({ error: 'Internal server error', details: err.message });
-  }
-});
+  }));
 
-// ─── GET /api/test/:id ────────────────────────────────────────────────────────
-router.get('/test/:id', async (req, res) => {
-  try {
-    const [rows] = await pool.execute('SELECT * FROM apis WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ error: `No API found with id ${req.params.id}` });
-    const testResult = await testApi(rows[0]);
+  // ─── GET /api/test/:id ────────────────────────────────────────────────────────
+  router.get('/test/:id', asyncHandler(async (req, res) => {
+    const api = await apiRepo.findById(req.params.id, req.workspaceId);
+    if (!api) {
+      throw new NotFoundError(`No API found with id ${req.params.id}`);
+    }
+
+    const testResult = await testApiFn(api);
     return res.json(testResult);
-  } catch (err) {
-    console.error(`GET /api/test/${req.params.id} error:`, err.message);
-    return res.status(500).json({ error: 'Internal server error', details: err.message });
-  }
-});
+  }));
 
-// ─── GET /api/list ────────────────────────────────────────────────────────────
-router.get('/list', async (_req, res) => {
-  try {
-    const [rows] = await pool.execute(`
-      SELECT
-        a.*,
-        tr.status_code   AS last_status_code,
-        tr.response_time AS last_response_time,
-        tr.result        AS last_result,
-        tr.error_message AS last_error,
-        tr.tested_at     AS last_tested_at
-      FROM apis a
-      LEFT JOIN test_results tr
-        ON tr.id = (
-          SELECT id FROM test_results
-          WHERE api_id = a.id
-          ORDER BY tested_at DESC
-          LIMIT 1
-        )
-      ORDER BY a.created_at DESC
-    `);
+  // ─── GET /api/list ────────────────────────────────────────────────────────────
+  router.get('/list', asyncHandler(async (req, res) => {
+    const rows = await apiRepo.findAllWithLatestResult(req.workspaceId);
     return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+  }));
 
-// ─── GET /api/history/:id ─────────────────────────────────────────────────────
-router.get('/history/:id', async (req, res) => {
-  try {
-    const [rows] = await pool.execute(
-      `SELECT * FROM test_results WHERE api_id = ? ORDER BY tested_at DESC LIMIT 20`,
-      [req.params.id]
-    );
+  // ─── GET /api/history/:id ─────────────────────────────────────────────────────
+  router.get('/history/:id', asyncHandler(async (req, res) => {
+    const api = await apiRepo.findById(req.params.id, req.workspaceId);
+    if (!api) {
+      throw new NotFoundError(`No API found with id ${req.params.id}`);
+    }
+
+    const rows = await testResultRepo.findRecentByApiId(req.params.id, 20, req.workspaceId);
     return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+  }));
 
-// ─── GET /api/stats ──────────────────────────────────────────────────────────
-// Aggregate counts for the stats cards
-router.get('/stats', async (_req, res) => {
-  try {
-    const [rows] = await pool.execute(`
-      SELECT
-        COUNT(*)                          AS total,
-        SUM(last_result = 'PASS')         AS passing,
-        SUM(last_result = 'FAIL')         AS failing,
-        SUM(last_result IS NULL)          AS untested,
-        ROUND(AVG(last_response_time), 0) AS avg_response_time
-      FROM (
-        SELECT
-          a.id,
-          tr.result        AS last_result,
-          tr.response_time AS last_response_time
-        FROM apis a
-        LEFT JOIN test_results tr
-          ON tr.id = (
-            SELECT id FROM test_results
-            WHERE api_id = a.id
-            ORDER BY tested_at DESC LIMIT 1
-          )
-      ) sub
-    `);
-    return res.json(rows[0]);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+  // ─── GET /api/stats ──────────────────────────────────────────────────────────
+  router.get('/stats', asyncHandler(async (req, res) => {
+    const stats = await apiRepo.getStats(req.workspaceId);
+    return res.json(stats);
+  }));
 
-// ─── GET /api/chart-data ──────────────────────────────────────────────────────
-// Last 10 test results per API, ready for Chart.js
-router.get('/chart-data', async (_req, res) => {
-  try {
-    const [apis] = await pool.execute('SELECT id, name FROM apis');
+  // ─── GET /api/chart-data ──────────────────────────────────────────────────────
+  router.get('/chart-data', asyncHandler(async (req, res) => {
+    const apis = await apiRepo.findAll(req.workspaceId);
     const result = {};
+
     await Promise.all(apis.map(async (api) => {
-      const [rows] = await pool.execute(
-        `SELECT response_time, result, status_code, tested_at
-         FROM test_results
-         WHERE api_id = ?
-         ORDER BY tested_at DESC LIMIT 10`,
-        [api.id]
-      );
+      const rows = await testResultRepo.findChartPoints(api.id, 10, req.workspaceId);
       result[api.id] = { name: api.name, points: rows.reverse() };
     }));
+
     return res.json(result);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+  }));
 
-// ─── DELETE /api/delete/:id ───────────────────────────────────────────────────
-router.delete('/delete/:id', async (req, res) => {
-  try {
-    const [result] = await pool.execute('DELETE FROM apis WHERE id = ?', [req.params.id]);
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'API not found' });
+  // ─── DELETE /api/delete/:id ───────────────────────────────────────────────────
+  router.delete('/delete/:id', asyncHandler(async (req, res) => {
+    const deleted = await apiRepo.deleteById(req.params.id, req.workspaceId);
+    if (!deleted) {
+      throw new NotFoundError('API not found');
+    }
     return res.json({ message: 'API deleted successfully' });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+  }));
 
-// ─── GET /api/analytics/summary ──────────────────────────────────────────────
-// Global analytics for the last N hours (default 24h)
-router.get('/analytics/summary', async (req, res) => {
-  try {
+  // ─── GET /api/analytics/summary ──────────────────────────────────────────────
+  router.get('/analytics/summary', asyncHandler(async (req, res) => {
     const hours = parseInt(req.query.hours, 10) || 24;
-    const data  = await getGlobalAnalytics(hours);
+    const data = await getGlobalAnalyticsFn(hours, {
+      workspaceId: req.workspaceId,
+      apiRepo,
+      testResultRepo,
+      runRepo: schedulerRunRepo,
+    });
     return res.json(data);
-  } catch (err) {
-    console.error('GET /api/analytics/summary error:', err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
+  }));
 
-// ─── GET /api/analytics/:id ───────────────────────────────────────────────────
-// Per-API analytics for the last N hours (default 24h)
-router.get('/analytics/:id', async (req, res) => {
-  try {
+  // ─── GET /api/analytics/:id ───────────────────────────────────────────────────
+  router.get('/analytics/:id', asyncHandler(async (req, res) => {
     const hours = parseInt(req.query.hours, 10) || 24;
-    const [apis] = await pool.execute('SELECT id FROM apis WHERE id = ?', [req.params.id]);
-    if (apis.length === 0) return res.status(404).json({ error: `No API with id ${req.params.id}` });
-    const data = await getApiAnalytics(req.params.id, hours);
+    const api = await apiRepo.findById(req.params.id, req.workspaceId);
+    if (!api) {
+      throw new NotFoundError(`No API with id ${req.params.id}`);
+    }
+
+    const data = await getApiAnalyticsFn(req.params.id, hours, {
+      workspaceId: req.workspaceId,
+      testResultRepo,
+    });
     return res.json(data);
-  } catch (err) {
-    console.error(`GET /api/analytics/${req.params.id} error:`, err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
+  }));
 
-// ─── GET /api/scheduler-runs ─────────────────────────────────────────────────
-// Recent scheduler cycle summaries (for timeline chart)
-router.get('/scheduler-runs', async (_req, res) => {
-  try {
-    const [rows] = await pool.execute(
-      `SELECT * FROM scheduler_runs ORDER BY ran_at DESC LIMIT 60`
-    );
-    return res.json(rows.reverse()); // oldest→newest for charting
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+  // ─── GET /api/scheduler-runs ─────────────────────────────────────────────────
+  router.get('/scheduler-runs', asyncHandler(async (_req, res) => {
+    const rows = await schedulerRunRepo.findRecent(60);
+    return res.json(rows.reverse()); // oldest -> newest for charting
+  }));
 
-module.exports = router;
+  return router;
+}
 
+const defaultRouter = createApiRouter();
+defaultRouter.createApiRouter = createApiRouter;
+
+module.exports = defaultRouter;

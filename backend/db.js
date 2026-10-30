@@ -1,70 +1,93 @@
 // backend/db.js
-const mysql = require('mysql2/promise');
+'use strict';
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'api_monitor',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+const mysql = require('mysql2/promise');
+const { loadConfig } = require('./config');
+
+let activePool = null;
 
 /**
- * Initialises the database and tables if they don't exist yet.
+ * Returns the active MySQL connection pool or creates one lazily.
+ *
+ * @param {Object} [overrideConfig]
+ * @returns {import('mysql2/promise').Pool}
  */
-async function initDB() {
-  // Create the database if missing
-  const raw = await mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
+function getPool(overrideConfig = null) {
+  if (activePool && !overrideConfig) {
+    return activePool;
+  }
+
+  if (overrideConfig && overrideConfig.execute) {
+    // Allows injecting a mock pool directly
+    activePool = overrideConfig;
+    return activePool;
+  }
+
+  const config = overrideConfig || loadConfig().db;
+
+  activePool = mysql.createPool({
+    host: config.host || 'localhost',
+    port: config.port || 3306,
+    user: config.user || 'root',
+    password: config.password !== undefined ? config.password : '',
+    database: config.database || 'api_monitor',
+    waitForConnections: true,
+    connectionLimit: config.connectionLimit || 10,
+    queueLimit: 0,
   });
 
-  await raw.execute(`CREATE DATABASE IF NOT EXISTS api_monitor
-    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-  await raw.end();
-
-  // Create the apis table
-  await pool.execute(`
-    CREATE TABLE IF NOT EXISTS apis (
-      id            INT AUTO_INCREMENT PRIMARY KEY,
-      name          VARCHAR(255)   NOT NULL,
-      url           TEXT           NOT NULL,
-      method        VARCHAR(10)    NOT NULL DEFAULT 'GET',
-      expected_status INT          NOT NULL DEFAULT 200,
-      created_at    DATETIME       DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Create the test_results table for history
-  await pool.execute(`
-    CREATE TABLE IF NOT EXISTS test_results (
-      id            INT AUTO_INCREMENT PRIMARY KEY,
-      api_id        INT            NOT NULL,
-      status_code   INT,
-      response_time INT,
-      result        ENUM('PASS','FAIL') NOT NULL,
-      error_message TEXT,
-      tested_at     DATETIME       DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (api_id) REFERENCES apis(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Track every 30-second scheduler cycle
-  await pool.execute(`
-    CREATE TABLE IF NOT EXISTS scheduler_runs (
-      id         INT AUTO_INCREMENT PRIMARY KEY,
-      total      INT NOT NULL DEFAULT 0,
-      passed     INT NOT NULL DEFAULT 0,
-      failed     INT NOT NULL DEFAULT 0,
-      avg_ms     INT,
-      ran_at     DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  console.log('✅  Database & tables ready');
+  return activePool;
 }
 
-module.exports = { pool, initDB };
+/**
+ * Overrides the active pool (primarily used in tests).
+ * @param {any} mockPool
+ */
+function setPool(mockPool) {
+  activePool = mockPool;
+}
+
+/**
+ * Closes the active MySQL pool if one exists.
+ */
+async function closePool() {
+  if (activePool && typeof activePool.end === 'function') {
+    await activePool.end();
+  }
+  activePool = null;
+}
+
+/**
+ * Pings the database to verify connectivity.
+ *
+ * @param {import('mysql2/promise').Pool} [poolInstance]
+ * @returns {Promise<boolean>}
+ */
+async function pingDatabase(poolInstance = null) {
+  const p = poolInstance || getPool();
+  const [rows] = await p.execute('SELECT 1 AS alive');
+  return Boolean(rows && rows.length > 0);
+}
+
+/**
+ * Lazy proxy to preserve backwards compatibility for `const { pool } = require('./db')`
+ * without connecting to MySQL on module import.
+ */
+const poolProxy = new Proxy({}, {
+  get(_target, prop) {
+    const pool = getPool();
+    const value = pool[prop];
+    if (typeof value === 'function') {
+      return value.bind(pool);
+    }
+    return value;
+  },
+});
+
+module.exports = {
+  pool: poolProxy,
+  getPool,
+  setPool,
+  closePool,
+  pingDatabase,
+};

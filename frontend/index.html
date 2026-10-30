@@ -57,9 +57,36 @@
           </svg>
           Analytics
         </button>
+        <button class="nav-tab" id="tabIncidents" role="tab" aria-selected="false" data-tab="incidents">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          Incidents <span class="badge-incident-count hidden" id="incidentCountBadge">0</span>
+        </button>
+        <button class="nav-tab" id="tabContracts" role="tab" aria-selected="false" data-tab="contracts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Contracts
+        </button>
       </nav>
 
       <div class="header-stats" id="headerStats">
+        <!-- Workspace Selector -->
+        <div class="workspace-selector-wrap" id="workspaceSelectorWrap">
+          <label class="sr-only" for="workspaceSelect">Active Workspace</label>
+          <select id="workspaceSelect" class="form-select workspace-select" aria-label="Select Workspace">
+            <option value="">Loading workspaces...</option>
+          </select>
+          <button id="newWorkspaceBtn" class="btn btn-ghost btn-icon-only" title="Create Workspace" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </button>
+        </div>
+
         <div class="stat-pill glass-pill" id="totalStat">
           <svg class="pill-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -79,6 +106,21 @@
             <span class="countdown-text font-mono" id="countdownText">30</span>
           </div>
           <span>Next Run</span>
+        </div>
+
+        <!-- User Profile & Logout -->
+        <div class="user-pill glass-pill hidden" id="userPill">
+          <svg class="pill-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          <span id="userDisplayName" class="font-mono">...</span>
+          <button id="logoutBtn" class="btn-logout" title="Sign out" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -137,6 +179,38 @@
                 required />
             </div>
           </div>
+
+          <!-- Advanced Options (Phase 3 Engine) -->
+          <details class="advanced-options">
+            <summary class="advanced-summary">Advanced Request &amp; Assertion Options</summary>
+            <div class="advanced-content">
+              <div class="form-group">
+                <label class="form-label" for="apiTimeout">Timeout (ms)</label>
+                <input id="apiTimeout" class="form-input font-mono" type="number" value="10000" min="100" max="30000" step="100" />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="apiHeaders">Custom Headers (JSON or key: value)</label>
+                <textarea id="apiHeaders" class="form-input font-mono" rows="2" placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'></textarea>
+              </div>
+
+              <div class="form-group" id="bodyGroup">
+                <label class="form-label" for="apiBody">Request Body (for POST/PUT/PATCH)</label>
+                <textarea id="apiBody" class="form-input font-mono" rows="2" placeholder='{"status": "ping"}'></textarea>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Assertions (Quick Presets or Custom JSON)</label>
+                <div class="preset-chips">
+                  <button type="button" class="preset-chip" id="presetStatus200">+ Status 200</button>
+                  <button type="button" class="preset-chip" id="presetLatency1000">+ Latency &lt; 1000ms</button>
+                  <button type="button" class="preset-chip" id="presetLatency500">+ Latency &lt; 500ms</button>
+                  <button type="button" class="preset-chip" id="presetClearAssertions">Clear</button>
+                </div>
+                <textarea id="apiAssertions" class="form-input font-mono" rows="3" placeholder='[{"type":"status","operator":"equals","expected":200},{"type":"latency","operator":"less_than","expected":1000}]' style="margin-top: 6px;"></textarea>
+              </div>
+            </div>
+          </details>
 
           <button id="addBtn" class="btn btn-primary glow-effect" type="submit">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -228,6 +302,19 @@
             <div class="stat-card-value text-red" id="scFailing">—</div>
           </div>
           <div class="stat-card-bg bg-red"></div>
+        </div>
+        <div class="stat-card glass-panel stat-card-error group">
+          <div class="stat-card-icon text-amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Execution Errors</div>
+            <div class="stat-card-value text-amber" id="scErrors">—</div>
+          </div>
+          <div class="stat-card-bg bg-amber"></div>
         </div>
         <div class="stat-card glass-panel stat-card-time group">
           <div class="stat-card-icon text-cyan">
@@ -398,6 +485,245 @@
 
   </div><!-- /viewAnalytics -->
 
+  <!-- ═════════════════════════════════════════════════════════════════════════
+       TAB: INCIDENTS (Phase 5 Lifecycle & Notifications)
+       ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="viewIncidents" class="tab-view hidden">
+    <!-- Header with status filter and Notification Settings action -->
+    <div class="incidents-header-bar glass-panel">
+      <div class="incidents-filter-group">
+        <button id="filterIncidentsOpen" class="filter-chip active" type="button" data-status="open">Open Incidents</button>
+        <button id="filterIncidentsResolved" class="filter-chip" type="button" data-status="resolved">Resolved</button>
+        <button id="filterIncidentsAll" class="filter-chip" type="button" data-status="all">All Incidents</button>
+      </div>
+      <div class="incidents-actions-group">
+        <button id="incidentsRefreshBtn" class="btn btn-ghost" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
+        <button id="notificationSettingsBtn" class="btn btn-secondary" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          Notification Settings
+        </button>
+      </div>
+    </div>
+
+    <!-- SMTP Warning banner if not configured -->
+    <div id="smtpNoticeBanner" class="notice-banner hidden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <span>SMTP is not configured in environment. Incidents are tracked and resolved normally, but outgoing email notifications are paused.</span>
+    </div>
+
+    <!-- Incident list & states -->
+    <div id="incidentsList" class="incidents-list">
+      <div id="incidentsLoading" class="incidents-loading glass-panel">
+        <div class="spinner"></div>
+        <span>Loading workspace incidents...</span>
+      </div>
+      <div id="incidentsEmpty" class="incidents-empty glass-panel hidden">
+        <div class="empty-icon-wrap glow-pulse">
+          <svg class="empty-icon text-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p class="empty-title" id="incidentsEmptyTitle">No Open Incidents</p>
+        <p class="empty-sub" id="incidentsEmptySub">All monitors in this workspace are operating normally.</p>
+      </div>
+      <div id="incidentsContainer" class="incidents-cards-grid"></div>
+    </div>
+  </div><!-- /viewIncidents -->
+
+  <!-- ══════════════════════════════════════════════════════════
+       TAB: CONTRACTS (Phase 6 OpenAPI 3.0 / 3.1 / 3.2 Management)
+  ══════════════════════════════════════════════════════════ -->
+  <div id="viewContracts" class="tab-view hidden">
+    <!-- Header with Import Contract & Refresh -->
+    <div class="contracts-header-bar glass-panel">
+      <div class="contracts-title-group">
+        <h2 class="section-title">OpenAPI Contracts</h2>
+        <p class="section-subtitle">Manage versioned API specifications, operation catalogs, and monitor bindings</p>
+      </div>
+      <div class="contracts-actions-group">
+        <button id="contractsRefreshBtn" class="btn btn-ghost" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
+        <button id="importContractBtn" class="btn btn-primary" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Import Contract
+        </button>
+      </div>
+    </div>
+
+    <!-- Contracts Container / State -->
+    <div class="contracts-content">
+      <div id="contractsLoading" class="contracts-loading glass-panel hidden">
+        <div class="spinner"></div>
+        <span>Loading workspace contracts...</span>
+      </div>
+      <div id="contractsEmpty" class="contracts-empty glass-panel hidden">
+        <div class="empty-icon-wrap glow-pulse">
+          <svg class="empty-icon text-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <p class="empty-title" id="contractsEmptyTitle">No Contracts Imported</p>
+        <p class="empty-sub" id="contractsEmptySub">Import an OpenAPI 3.0, 3.1, or 3.2 specification to enable contract validation.</p>
+      </div>
+      <div id="contractsContainer" class="contracts-cards-grid"></div>
+    </div>
+  </div><!-- /viewContracts -->
+
+  <!-- ── Incident Detail Modal ── -->
+  <div id="incidentDetailModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Incident Detail">
+    <div class="modal glass-panel incident-modal">
+      <button class="modal-close" id="incidentModalClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <div class="incident-modal-header">
+        <span class="badge" id="incidentModalBadge">OPEN</span>
+        <h3 id="incidentModalTitle">Incident #</h3>
+      </div>
+      <div class="incident-modal-meta grid-2col" id="incidentModalMeta"></div>
+      <div class="incident-modal-summary" id="incidentModalSummary"></div>
+      <h4 class="incident-results-heading">Recent Execution History</h4>
+      <div class="incident-results-table-wrap">
+        <table class="table-results" id="incidentResultsTable">
+          <thead>
+            <tr><th>Status</th><th>Time</th><th>Latency</th><th>Error / Details</th></tr>
+          </thead>
+          <tbody id="incidentResultsBody"></tbody>
+        </table>
+      </div>
+
+      <!-- AI Incident Investigation Section (Phase 7) -->
+      <div class="ai-investigation-section">
+        <div class="ai-investigation-header">
+          <div class="ai-header-left">
+            <span class="ai-sparkle-icon">✨</span>
+            <h4 class="ai-heading">AI Incident Investigation</h4>
+            <span class="badge" id="aiStatusBadge">NOT REQUESTED</span>
+          </div>
+          <div class="ai-header-right">
+            <button class="btn btn-secondary btn-sm" id="triggerAiAnalysisBtn">
+              <span>Investigate with AI</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- AI Stale Warning Banner -->
+        <div id="aiStaleWarning" class="ai-alert ai-alert-warning hidden">
+          <span>⚠️ <strong>Snapshot Stale:</strong> New monitor executions have been recorded since this analysis was generated.</span>
+          <button class="btn btn-sm btn-outline" id="aiReanalyzeBtn">Re-analyze</button>
+        </div>
+
+        <!-- AI Loading / Polling State -->
+        <div id="aiLoadingContainer" class="ai-loading-card hidden">
+          <div class="spinner"></div>
+          <span id="aiLoadingText">Analyzing incident telemetry and contract findings...</span>
+        </div>
+
+        <!-- AI Error State -->
+        <div id="aiErrorContainer" class="ai-error-card hidden">
+          <p class="ai-error-title" id="aiErrorTitle">Investigation Failed</p>
+          <p class="ai-error-msg" id="aiErrorMessage"></p>
+          <button class="btn btn-sm btn-secondary" id="aiRetryBtn">Retry Analysis</button>
+        </div>
+
+        <!-- AI Results Display -->
+        <div id="aiResultContainer" class="ai-result-card hidden">
+          <div class="ai-summary-box">
+            <p class="ai-summary-text" id="aiSummaryText"></p>
+            <div class="ai-meta-line" id="aiMetaLine"></div>
+          </div>
+
+          <div class="ai-details-grid">
+            <!-- Observed Facts -->
+            <div class="ai-block">
+              <h5>Observed Facts</h5>
+              <ul class="ai-facts-list" id="aiFactsList"></ul>
+            </div>
+
+            <!-- Hypotheses -->
+            <div class="ai-block">
+              <h5>Plausible Hypotheses</h5>
+              <div class="ai-hypotheses-list" id="aiHypothesesList"></div>
+            </div>
+
+            <!-- Recommended Checks -->
+            <div class="ai-block">
+              <h5>Recommended Diagnostic Checks</h5>
+              <ul class="ai-checks-list" id="aiChecksList"></ul>
+            </div>
+
+            <!-- Missing Evidence & Assessment -->
+            <div class="ai-block">
+              <h5>Missing Evidence & Assessment</h5>
+              <ul class="ai-unknowns-list" id="aiUnknownsList"></ul>
+              <div class="ai-confidence-box" id="aiConfidenceBox"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Notification Settings Modal ── -->
+  <div id="notificationSettingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Notification Settings">
+    <div class="modal glass-panel settings-modal">
+      <button class="modal-close" id="notifSettingsClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <h3 class="modal-title">Workspace Notification Settings</h3>
+      <p class="modal-sub">Configure incident email alerts and select authorized recipients from workspace members.</p>
+
+      <form id="notificationSettingsForm" class="settings-form">
+        <div class="settings-section">
+          <h4 class="settings-section-title">Email Alerts</h4>
+          <label class="checkbox-label">
+            <input type="checkbox" id="notifNotifyOnOpen" checked />
+            <span>Send email alert when an incident opens (2 consecutive failures)</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="notifNotifyOnResolve" checked />
+            <span>Send email alert when an incident resolves (2 consecutive passes)</span>
+          </label>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Authorized Recipients</h4>
+          <p class="settings-hint">Select active workspace members who will receive alerts. Arbitrary external emails are disallowed.</p>
+          <div id="recipientsListContainer" class="recipients-list-container">
+            <!-- Checkbox list of workspace members injected here -->
+          </div>
+        </div>
+
+        <div id="settingsFeedback" class="feedback"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="notifSettingsCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="notifSettingsSaveBtn">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 
   <!-- ── Result Modal ── -->
   <div id="resultModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Test Result">
@@ -415,6 +741,18 @@
 
       <div class="result-grid" id="resultGrid"></div>
 
+      <!-- Contract Validation Verdict & Findings (Phase 6) -->
+      <div id="contractResultSection" class="contract-result-section hidden" style="margin-top: 14px;">
+        <div class="flex-between" style="align-items: center; margin-bottom: 8px;">
+          <div class="json-label" style="margin-bottom: 0;">OpenAPI Contract Validation</div>
+          <span id="contractVerdictBadge" class="badge"></span>
+        </div>
+        <div id="contractTruncatedNotice" class="toast toast-warning hidden" style="position: static; margin-bottom: 8px; font-size: 0.8rem; padding: 6px 10px;">
+          ⚠️ Payload exceeded 64 KB inspection limit. Contract validation evaluated available headers and body.
+        </div>
+        <div id="contractFindingsList" class="contract-findings-list"></div>
+      </div>
+
       <div class="result-json-wrap">
         <div class="json-label">Raw JSON Payload</div>
         <pre id="resultJson" class="result-json font-mono"></pre>
@@ -422,8 +760,235 @@
     </div>
   </div>
 
+  <!-- ── Import Contract Modal ── -->
+  <div id="importContractModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Import OpenAPI Contract">
+    <div class="modal glass-panel" style="max-width: 620px;">
+      <button class="modal-close" id="importContractClose" aria-label="Close" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <h3 class="modal-title">Import OpenAPI Contract</h3>
+      <p class="modal-sub">Supports OpenAPI 3.0.x, 3.1.x, and 3.2.x in JSON or YAML up to 1 MiB.</p>
+      <form id="importContractForm" class="form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="importContractName">Contract Name</label>
+          <input id="importContractName" class="form-input" type="text" placeholder="e.g. Users Service API" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="importContractDesc">Description (optional)</label>
+          <input id="importContractDesc" class="form-input" type="text" placeholder="e.g. Core authentication and user management" />
+        </div>
+        <div class="form-group">
+          <div class="flex-between" style="margin-bottom: 4px;">
+            <label class="form-label" for="importContractSpec" style="margin-bottom: 0;">Specification (JSON or YAML)</label>
+            <label class="file-upload-label btn btn-ghost btn-xs" style="cursor: pointer;">
+              <span>📁 Choose File</span>
+              <input type="file" id="importContractFile" accept=".json,.yaml,.yml" style="display: none;" />
+            </label>
+          </div>
+          <textarea id="importContractSpec" class="form-input font-mono" rows="10" placeholder="openapi: 3.0.3&#10;info:&#10;  title: Sample API&#10;  version: 1.0.0&#10;paths:&#10;  /health:&#10;    get:&#10;      responses:&#10;        '200':&#10;          description: OK" required></textarea>
+        </div>
+        <div id="importContractFeedback" class="feedback hidden"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="importContractCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="importContractSubmitBtn">Import &amp; Validate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Contract Detail Modal (Revisions & Operations Explorer) ── -->
+  <div id="contractDetailModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Contract Details">
+    <div class="modal glass-panel" style="max-width: 860px; max-height: 90vh; overflow-y: auto;">
+      <button class="modal-close" id="contractDetailClose" aria-label="Close" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <div class="contract-detail-header">
+        <div class="flex-between" style="align-items: flex-start; gap: 12px;">
+          <div>
+            <h3 id="contractDetailTitle" style="font-size: 1.3rem; margin-bottom: 4px;">Contract Name</h3>
+            <p id="contractDetailDesc" class="text-muted" style="font-size: 0.9rem; margin-bottom: 8px;"></p>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button id="archiveContractBtn" class="btn btn-secondary btn-sm" style="color: var(--danger-color); border-color: rgba(239, 68, 68, 0.3);" type="button">
+              Archive Contract
+            </button>
+            <button id="addRevisionBtn" class="btn btn-secondary btn-sm" type="button">
+              + New Revision
+            </button>
+          </div>
+        </div>
+        <div class="contract-revision-bar flex-between" style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label for="revisionSelect" style="font-size: 0.85rem; font-weight: 500;">Revision:</label>
+            <select id="revisionSelect" class="form-select font-mono" style="padding: 4px 10px; font-size: 0.85rem; min-width: 180px;"></select>
+          </div>
+          <div id="revisionMeta" style="font-size: 0.8rem;" class="text-muted font-mono"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 18px;">
+        <h4 style="font-size: 1rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+          <span>Operations Catalog</span>
+          <span id="operationsCountBadge" class="badge" style="background: rgba(255,255,255,0.1);">0</span>
+        </h4>
+        <div id="operationsList" class="operations-table-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── New Revision Modal ── -->
+  <div id="newRevisionModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Publish New Revision">
+    <div class="modal glass-panel" style="max-width: 620px;">
+      <button class="modal-close" id="newRevisionClose" aria-label="Close" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <h3 class="modal-title">Publish New Contract Revision</h3>
+      <p class="modal-sub">Append an immutable revision. Existing monitor bindings remain pinned to their specific revision.</p>
+      <form id="newRevisionForm" class="form" novalidate>
+        <div class="form-group">
+          <div class="flex-between" style="margin-bottom: 4px;">
+            <label class="form-label" for="newRevisionSpec" style="margin-bottom: 0;">Specification (JSON or YAML)</label>
+            <label class="file-upload-label btn btn-ghost btn-xs" style="cursor: pointer;">
+              <span>📁 Choose File</span>
+              <input type="file" id="newRevisionFile" accept=".json,.yaml,.yml" style="display: none;" />
+            </label>
+          </div>
+          <textarea id="newRevisionSpec" class="form-input font-mono" rows="10" placeholder="Paste updated OpenAPI 3.0 / 3.1 / 3.2 specification..." required></textarea>
+        </div>
+        <div id="newRevisionFeedback" class="feedback hidden"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="newRevisionCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="newRevisionSubmitBtn">Publish Revision</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Bind Monitor to Contract Modal ── -->
+  <div id="bindContractModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Contract Binding">
+    <div class="modal glass-panel" style="max-width: 520px;">
+      <button class="modal-close" id="bindContractClose" aria-label="Close" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <h3 class="modal-title">Contract Binding</h3>
+      <p class="modal-sub" id="bindContractSubtitle">Bind monitor to an OpenAPI contract operation for preflight &amp; response validation.</p>
+      <form id="bindContractForm" class="form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="bindContractSelect">Select Contract</label>
+          <select id="bindContractSelect" class="form-select" required>
+            <option value="">-- Choose Contract --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="bindRevisionSelect">Select Revision</label>
+          <select id="bindRevisionSelect" class="form-select font-mono" required>
+            <option value="">-- Choose Revision --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="bindOperationSelect">Select Operation</label>
+          <select id="bindOperationSelect" class="form-select font-mono" required>
+            <option value="">-- Choose Operation --</option>
+          </select>
+        </div>
+        <div id="bindContractFeedback" class="feedback hidden"></div>
+        <div class="modal-actions flex-between">
+          <button type="button" class="btn btn-delete btn-sm hidden" id="unbindContractBtn">Unbind Contract</button>
+          <div style="display: flex; gap: 8px; margin-left: auto;">
+            <button type="button" class="btn btn-ghost" id="bindContractCancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="bindContractSubmitBtn">Save Binding</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ── Toast ── -->
   <div id="toast" class="toast hidden" role="alert"></div>
+
+  <!-- ── Authentication Modal (Login / Register) ── -->
+  <div id="authModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Sign In or Register">
+    <div class="modal glass-panel auth-modal">
+      <div class="auth-header">
+        <div class="logo-text auth-logo">API<span class="logo-accent">Dash</span></div>
+        <p class="auth-sub" id="authSub">Sign in to access your monitoring workspaces</p>
+      </div>
+
+      <div class="auth-tabs" role="tablist">
+        <button id="authTabLogin" class="auth-tab-btn active" type="button" role="tab" aria-selected="true">Sign In</button>
+        <button id="authTabRegister" class="auth-tab-btn" type="button" role="tab" aria-selected="false">Create Account</button>
+      </div>
+
+      <div id="authError" class="auth-error hidden"></div>
+
+      <!-- Login Form -->
+      <form id="loginForm" class="form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="loginEmail">Email Address</label>
+          <input id="loginEmail" class="form-input" type="email" placeholder="name@company.com" required autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">Password</label>
+          <input id="loginPassword" class="form-input" type="password" placeholder="••••••••" required autocomplete="current-password" />
+        </div>
+        <button id="loginSubmitBtn" class="btn btn-primary glow-effect" type="submit" style="width:100%">
+          Sign In
+        </button>
+      </form>
+
+      <!-- Registration Form -->
+      <form id="registerForm" class="form hidden" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="registerName">Display Name</label>
+          <input id="registerName" class="form-input" type="text" placeholder="e.g. Alex Smith" required autocomplete="name" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="registerEmail">Email Address</label>
+          <input id="registerEmail" class="form-input" type="email" placeholder="name@company.com" required autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="registerPassword">Password (minimum 8 characters)</label>
+          <input id="registerPassword" class="form-input" type="password" placeholder="••••••••" required minlength="8" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="registerWsName">Initial Workspace Name</label>
+          <input id="registerWsName" class="form-input" type="text" placeholder="e.g. Production Team" value="My Workspace" required />
+        </div>
+        <button id="registerSubmitBtn" class="btn btn-primary glow-effect" type="submit" style="width:100%">
+          Create Account &amp; Workspace
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Create Workspace Modal ── -->
+  <div id="createWorkspaceModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Create Workspace">
+    <div class="modal glass-panel" style="max-width: 440px;">
+      <button class="modal-close" id="createWsClose" aria-label="Close" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <h3 class="modal-title">Create Workspace</h3>
+      <form id="createWorkspaceForm" class="form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="newWsName">Workspace Name</label>
+          <input id="newWsName" class="form-input" type="text" placeholder="e.g. Staging Environments" required />
+        </div>
+        <button id="createWsSubmitBtn" class="btn btn-primary glow-effect" type="submit" style="width:100%">
+          Create Workspace
+        </button>
+      </form>
+    </div>
+  </div>
 
   <script>
     // Countdown Timer logic
