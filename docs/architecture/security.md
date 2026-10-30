@@ -37,13 +37,13 @@ sequenceDiagram
     participant DB as MySQL Sessions Table
 
     Note over Browser,API: 1. Authentication Handshake
-    Browser->>API: POST /api/auth/login (email, password)
+    Browser->>API: POST /api/auth/login with credentials
     API->>API: Verify Argon2id hash
-    API->>DB: INSERT session (user_id, session_id, expires)
-    API-->>Browser: Set-Cookie: connect.sid=s%3A...; HttpOnly; Secure; SameSite=Lax<br/>Set-Cookie: XSRF-TOKEN=uuid; Path=/
+    API->>DB: INSERT session with user_id and expires
+    API-->>Browser: Set-Cookie: connect.sid HttpOnly Secure SameSite=Lax<br/>Set-Cookie: XSRF-TOKEN Path=/
     
     Note over Browser,API: 2. State-Mutating Request - Create Monitor
-    Browser->>API: POST /api/monitors<br/>Header: x-csrf-token: uuid<br/>Cookie: connect.sid=...; XSRF-TOKEN=uuid
+    Browser->>API: POST /api/monitors<br/>Header: x-csrf-token<br/>Cookie: connect.sid and XSRF-TOKEN
     API->>API: Validate csrfToken matches XSRF-TOKEN cookie
     API->>DB: Validate session in sessions table
     API-->>Browser: 201 Created

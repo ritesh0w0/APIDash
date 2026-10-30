@@ -12,24 +12,24 @@ To guarantee that email notifications are never lost if the email delivery servi
 sequenceDiagram
     autonumber
     participant Coord as Monitoring Coordinator
-    participant DB as MySQL (notification_outbox)
-    participant W as Notification Dispatcher (Worker)
+    participant DB as MySQL Notification Outbox
+    participant W as Notification Dispatcher Worker
     participant SMTP as Gmail SMTP Relay
-    participant Recipient as Workspace Owner / Member
+    participant Recipient as Workspace Owner or Member
 
-    Coord->>DB: INSERT INTO notification_outbox<br/>(status='PENDING', recipient_email, payload)
-    Note over Coord,DB: Written inside the same transaction<br/>that marks incident OPEN/RESOLVED
+    Coord->>DB: INSERT INTO notification_outbox status PENDING
+    Note over Coord,DB: Written inside the same transaction<br/>that marks incident OPEN or RESOLVED
 
     loop Every 1 Second
-        W->>DB: SELECT * FROM notification_outbox WHERE status='PENDING' LIMIT 5 FOR UPDATE SKIP LOCKED
-        W->>SMTP: Send Email via TLS (smtp.gmail.com:587)
+        W->>DB: SELECT from notification_outbox WHERE status PENDING FOR UPDATE SKIP LOCKED
+        W->>SMTP: Send Email via TLS on port 587
         alt Delivery Succeeded
             SMTP-->>W: 250 2.0.0 OK
-            W->>DB: UPDATE notification_outbox SET status='SENT', sent_at=NOW()
+            W->>DB: UPDATE notification_outbox SET status SENT and sent_at NOW
             SMTP->>Recipient: Deliver Alert to Inbox
-        else Delivery Failed / Network Timeout
-            SMTP-->>W: Connection Refused / Timeout
-            W->>DB: UPDATE notification_outbox SET attempts=attempts+1, next_retry_at=NOW()+INTERVAL (attempts * 60)s
+        else Delivery Failed or Network Timeout
+            SMTP-->>W: Connection Refused or Timeout
+            W->>DB: UPDATE notification_outbox SET attempts incremented and next retry scheduled
         end
     end
 ```

@@ -20,7 +20,7 @@ sequenceDiagram
     participant Secondary as Fallback LLM OpenRouter
 
     Inc->>DB: INSERT INTO incident_ai_analyses<br/>status PENDING with evidence package
-    Note over Inc: Non-blocking; HTTP execution completes immediately
+    Note over Inc: Non-blocking - HTTP execution completes immediately
 
     loop Every 2 Seconds
         Worker->>DB: Claim pending analysis job - lease acquisition

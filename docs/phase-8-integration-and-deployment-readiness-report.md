@@ -48,54 +48,54 @@ Phase 8 verified that this known defect does not result in an unhandled error, a
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as User / Client
-    participant Router as Workspace Router (/analyze)
+    actor User as User or Client
+    participant Router as Workspace Router
     participant Builder as IncidentEvidenceBuilder
-    participant Repo as AiAnalysisRepository (MySQL)
+    participant Repo as AiAnalysisRepository MySQL
     participant Worker as AiAnalysisWorker
     participant Fallback as FallbackAiProvider
     participant Validator as AiResponseValidator
-    participant Groq as Primary (Groq GPT-OSS-20B)
-    participant OpenRouter as Alternative (OpenRouter Nemotron)
+    participant Groq as Primary Groq Provider
+    participant OpenRouter as Alternative OpenRouter Provider
 
-    User->>Router: POST /api/workspaces/:wsId/incidents/:incId/analyze
-    Router->>Builder: buildEvidenceSnapshot(incidentId)
-    Builder-->>Router: { evidenceSnapshot, evidenceFingerprint }
-    Router->>Repo: enqueueJob(workspaceId, incidentId, snapshot, fingerprint)
-    Repo-->>Router: { jobId, status: 'pending' }
-    Router-->>User: 202 Accepted { job_id, status: 'pending' }
+    User->>Router: POST analyze incident request
+    Router->>Builder: buildEvidenceSnapshot - incidentId
+    Builder-->>Router: evidenceSnapshot and fingerprint
+    Router->>Repo: enqueueJob - workspaceId, incidentId
+    Repo-->>Router: jobId with status pending
+    Router-->>User: 202 Accepted with job_id
 
     Note over Worker,Repo: Background Polling Loop
-    Worker->>Repo: claimPendingJob(workerId, leaseDurationMs)
-    Repo-->>Worker: Claimed Job Row (with lease_owner_token)
+    Worker->>Repo: claimPendingJob - workerId
+    Repo-->>Worker: Claimed Job Row with lease token
 
-    Worker->>Fallback: generateAnalysis(evidenceSnapshot, { workspaceId })
-    Fallback->>Validator: validateEvidenceSnapshot(evidenceSnapshot)
+    Worker->>Fallback: generateAnalysis - evidenceSnapshot
+    Fallback->>Validator: validateEvidenceSnapshot - evidenceSnapshot
     Validator-->>Fallback: Snapshot Valid
 
     Note over Fallback,Groq: 1. Attempt Primary Provider
-    Fallback->>Groq: generateAnalysis(evidenceSnapshot)
-    Groq-->>Fallback: Raw JSON (SYN-002: missing "overall_assessment")
-    Fallback->>Validator: validateAiResponse(rawJson, evidenceSnapshot)
-    Validator-->>Fallback: Throws SCHEMA_VALIDATION_ERROR ("must have required property 'overall_assessment'")
+    Fallback->>Groq: generateAnalysis - evidenceSnapshot
+    Groq-->>Fallback: Raw JSON missing overall_assessment
+    Fallback->>Validator: validateAiResponse - rawJson
+    Validator-->>Fallback: Throws SCHEMA_VALIDATION_ERROR
 
     Note over Fallback,OpenRouter: 2. Automatic Fallback Interception
-    Fallback->>Fallback: Record primary failure diagnostic (SCHEMA_OR_CITATION_FAILURE)
-    Fallback->>OpenRouter: generateAnalysis(evidenceSnapshot)
-    OpenRouter-->>Fallback: Raw JSON (contains valid "overall_assessment" + grounded citations)
-    Fallback->>Validator: validateAiResponse(altJson, evidenceSnapshot)
-    Validator-->>Fallback: Valid (100% Schema, 100% Citations)
+    Fallback->>Fallback: Record primary failure diagnostic
+    Fallback->>OpenRouter: generateAnalysis - evidenceSnapshot
+    OpenRouter-->>Fallback: Raw JSON with valid assessment and citations
+    Fallback->>Validator: validateAiResponse - altJson
+    Validator-->>Fallback: Valid Schema and Citations
 
-    Fallback-->>Worker: Winning Analysis + Fallback Metadata (_fallback)
-    Worker->>Repo: completeJob(jobId, workerToken, result, provider='openrouter', model='nvidia/nemotron-3.5-super-vl:free')
-    Repo-->>Worker: Job Marked 'completed'
+    Fallback-->>Worker: Winning Analysis with Fallback Metadata
+    Worker->>Repo: completeJob - jobId, workerToken, result
+    Repo-->>Worker: Job Marked completed
 
-    User->>Router: GET /api/workspaces/:wsId/incidents/:incId/analysis
-    Router->>Repo: getLatestByIncident(incidentId)
+    User->>Router: GET incident analysis
+    Router->>Repo: getLatestByIncident - incidentId
     Repo-->>Router: Job Record
-    Router->>Router: serializeAnalysisForClient(jobRecord)
-    Note over Router: Strips lease_owner_token, sanitizes credentials
-    Router-->>User: 200 OK (Clean Client Payload with Winning Fallback Metadata)
+    Router->>Router: serializeAnalysisForClient - jobRecord
+    Note over Router: Strips lease token and sanitizes credentials
+    Router-->>User: 200 OK Clean Client Payload
 ```
 
 ### 2.3 Verified Provenance & Invariants

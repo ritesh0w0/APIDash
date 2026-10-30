@@ -16,7 +16,7 @@ sequenceDiagram
     participant DB as MySQL Schedules Table
 
     W1->>DB: SELECT id FROM schedules WHERE next_run_at <= NOW() FOR UPDATE SKIP LOCKED
-    Note over DB: Locks claimed rows; W2 skips them
+    Note over DB: Locks claimed rows - W2 skips them
     W2->>DB: SELECT id FROM schedules ... FOR UPDATE SKIP LOCKED
     Note over W2: W2 claims next available rows or sleeps
 
