@@ -1,9 +1,9 @@
 # 11. AI Incident Investigation Subsystem
 
-APIDash incorporates an optional, out-of-band **AI Incident Investigation Subsystem**. When an incident occurs, the platform can automatically synthesize diagnostic telemetry, package it into an evidence snapshot, and query an LLM to generate structured hypotheses and remediation steps.
+APIDash incorporates an optional, out-of-band **AI Incident Investigation Subsystem**. When an incident occurs, users can request an automated root-cause analysis. The platform packages diagnostic telemetry into an evidence snapshot (`[E-001]`, `[E-002]`...) and queries an LLM provider to generate structured hypotheses and actionable remediation checks.
 
 > [!IMPORTANT]
-> **Production Policy:** In accordance with production design requirements, all external AI providers remain **disabled by default** (`AI_PROVIDER=disabled`). Incident monitoring, contract validation, and alerting operate with 100% deterministic fidelity without requiring AI. When enabled, AI operations run strictly out-of-band and never impede core monitoring pipelines.
+> **Production Policy:** All external AI providers remain strictly **user-triggered and out-of-band**. AI is never invoked automatically on monitoring failure and never blocks the monitoring hot path. When disabled (`AI_PROVIDER=disabled`), monitoring operates with 100% deterministic fidelity.
 
 ---
 
@@ -12,70 +12,99 @@ APIDash incorporates an optional, out-of-band **AI Incident Investigation Subsys
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Inc as Incident Service
-    participant DB as MySQL Incident AI Analyses
+    participant UI as User Interface
+    participant API as Express API Server
+    participant DB as MySQL Database
     participant Worker as AI Worker Daemon
-    participant Fallback as Fallback AI Provider
-    participant Primary as Primary LLM Groq
-    participant Secondary as Fallback LLM OpenRouter
+    participant Fallback as FallbackAiProvider
+    participant Primary as Primary LLM (Groq)
+    participant Secondary as Fallback LLM (OpenRouter / NVIDIA)
 
-    Inc->>DB: INSERT INTO incident_ai_analyses<br/>status PENDING with evidence package
-    Note over Inc: Non-blocking - HTTP execution completes immediately
+    UI->>API: POST /api/workspaces/:ws/incidents/:id/ai-analysis
+    API->>API: Build sanitized evidence snapshot ([E-001], [E-002]...)
+    API->>DB: INSERT INTO incident_ai_analyses (status: pending)
+    API-->>UI: 201 Created (Analysis job queued)
 
-    loop Every 2 Seconds
-        Worker->>DB: Claim pending analysis job - lease acquisition
-        Worker->>Fallback: analyzeIncident(evidencePackage)
+    loop Polling Loop (Every 2 Seconds)
+        Worker->>DB: Claim pending job (FOR UPDATE SKIP LOCKED)
+        Worker->>Fallback: generateAnalysis(evidenceSnapshot, options)
         
         alt Primary Provider Succeeds
-            Fallback->>Primary: POST /chat/completions - Strict Schema
-            Primary-->>Fallback: Valid JSON Response with Citations
-        else Primary Returns 429 / 5xx / Timeout
-            Fallback->>Secondary: POST /chat/completions - Fallback
-            Secondary-->>Fallback: Valid JSON Response with Citations
+            Fallback->>Primary: POST /chat/completions (openai/gpt-oss-20b)
+            Primary-->>Fallback: 200 OK with Structured JSON
+        else Primary Fails (429 / 5xx / Timeout / Schema Failure)
+            Note over Fallback: Preserve failure diagnostic & update ProcessRateLimitTracker
+            Fallback->>Secondary: POST /chat/completions (nvidia/nemotron-3.5-lightning:free via OpenRouter)
+            Secondary-->>Fallback: 200 OK with Structured JSON
         end
 
-        Worker->>Worker: Validate Response Schema and Verify Citations
-        Worker->>DB: UPDATE incident_ai_analyses<br/>SET status COMPLETED with JSON result
+        Worker->>Worker: Validate JSON against responseJsonSchema & verify citations
+        Worker->>DB: UPDATE incident_ai_analyses SET status: completed, provider, model, result
     end
+
+    UI->>API: GET /api/workspaces/:ws/incidents/:id/ai-analysis
+    API-->>UI: 200 OK (Displays winning provider, model, duration, facts, hypotheses)
 ```
-
----
-
-## 🛡️ Anti-Hallucination & Evidence Citation Grounding
-
-To prevent LLMs from generating speculative or hallucinated explanations, APIDash implements **Evidence-Grounded Prompting**:
-
-1. **Deterministic Evidence Packaging:** The `incidentEvidenceBuilder` constructs a standardized JSON evidence bundle containing:
-   * `[E1]`: Failed HTTP status code and status text.
-   * `[E2]`: Target endpoint URL and HTTP method.
-   * `[E3]`: Response latency and historical baseline averages.
-   * `[E4]`: Response headers (excluding sensitive cookies/auth).
-   * `[E5]`: Sanitized response body (safely truncated).
-   * `[E6]`: Specific assertion violation or contract drift error message.
-2. **Mandatory Citation Validation:** Every hypothesis returned by the LLM must cite the specific evidence tag (e.g., `"cited_evidence": ["E1", "E5"]`).
-3. **Citation Verifier:** `aiResponseValidator.js` programmatically validates that every cited identifier exists in the original evidence package. Responses citing non-existent evidence IDs are rejected as hallucinations.
 
 ---
 
 ## 🔀 Resilient Dual-Provider Fallback Orchestrator
 
-The `FallbackAiProvider` provides high-availability inference across upstream AI infrastructure:
+The `FallbackAiProvider` (`backend/services/aiProviderService.js`) orchestrates multi-provider resilience without introducing unnecessary external infrastructure:
 
-* **Primary Provider:** Typically configured for high-speed inference (e.g., Groq with `llama-3.3-70b-versatile`).
-* **Secondary Provider:** Activated automatically on failures (e.g., OpenRouter with `google/gemini-2.0-flash-exp:free` or OpenAI-compatible endpoints).
-* **Automatic Failover Triggers:**
-  * Upstream HTTP `429 Too Many Requests` (Rate Limits).
-  * Upstream HTTP `500`/`503` Server Errors.
-  * Inference Timeout (`AI_TIMEOUT` exceeded).
-  * Malformed JSON or schema validation failure on primary output.
-* **Fast-Path In-Memory Circuit Breaker:** When a provider is rate-limited, subsequent requests within the reset window automatically bypass the primary provider without incurring network latency.
+* **Primary Provider:** Groq
+  - **Model:** `openai/gpt-oss-20b`
+  - **Base URL:** `https://api.groq.com/openai/v1`
+  - **Characteristics:** Ultra-low latency inference (~1.7s–2.0s) with OpenAI-compatible chat completions.
+* **Fallback Gateway:** OpenRouter
+  - **Underlying Model:** NVIDIA Nemotron 3.5 Lightning Free
+  - **Model Identifier:** `nvidia/nemotron-3.5-lightning:free`
+  - **Base URL:** `https://openrouter.ai/api/v1`
+  - **Role:** OpenRouter serves as the unified API gateway providing access to NVIDIA's model with reasoning control (`reasoning: { effort: 'none' }` for deterministic fast JSON output).
+
+### Error Classification & Failover Matrix
+
+| Error Condition | HTTP Code / Classification | Failover Eligible? | Primary Action | Fallback Action |
+| :--- | :--- | :--- | :--- | :--- |
+| **Rate Limiting** | HTTP `429` (`AI_RATE_LIMIT`) | **Yes** | Updates `ProcessRateLimitTracker` | Dispatches immediately to OpenRouter / NVIDIA |
+| **Server Errors** | HTTP `500` / `502` / `503` / `504` | **Yes** | Records diagnostic | Dispatches immediately to OpenRouter / NVIDIA |
+| **Timeouts** | `AI_TIMEOUT` (exceeded timeout budget) | **Yes** | Records diagnostic | Dispatches immediately to OpenRouter / NVIDIA |
+| **Network Failure**| `AI_NETWORK_ERROR` (connection refused/reset)| **Yes** | Records diagnostic | Dispatches immediately to OpenRouter / NVIDIA |
+| **Schema/Citation Failure** | HTTP `422` / `INVALID_AI_OUTPUT` | **Yes** | Records validation error | Dispatches immediately to OpenRouter / NVIDIA |
+| **Authentication Error** | HTTP `401` / `403` | **Yes** | Preserves config diagnostic | Dispatches to OpenRouter / NVIDIA |
+| **Malformed Snapshot** | HTTP `400` (`INVALID_EVIDENCE_SNAPSHOT`)| **No** | Rejects locally | Neither provider is contacted |
+| **Dual Exhaustion**| Both providers fail | **Terminal** | Throws `AI_DUAL_PROVIDER_EXHAUSTION` | Marks job non-retryable; safe user message without leaking keys |
+
+### Fast-Path In-Memory Circuit Breaker
+
+`ProcessRateLimitTracker` monitors rate limit response headers (`x-ratelimit-remaining-tokens`, `x-ratelimit-reset-tokens`, `retry-after`). When the primary Groq provider is rate-limited:
+1. `recordRateLimit()` marks the primary provider blocked until the reset timestamp expires.
+2. Subsequent investigations within the reset window automatically **fast-path** to OpenRouter / NVIDIA without incurring failed network round-trips to Groq.
+3. Upon expiration of the block window, traffic naturally probes Groq first.
+
+---
+
+## 🛡️ Anti-Hallucination & Evidence Grounding
+
+To prevent LLMs from generating speculative explanations, APIDash enforces a strict verification pipeline:
+
+1. **Evidence Snapshot Generation (`incidentEvidenceBuilder.js`):**
+   - Telemetry is assembled into immutable, numbered observation tokens:
+     * `[E-001]`: Incident lifecycle state, duration, consecutive failure streak.
+     * `[E-002]`: Monitor HTTP configuration (method, sanitized URL).
+     * `[E-003]`: Execution telemetry (status code, latency, error category).
+2. **Strict JSON Schema Enforcement (`aiResponseValidator.js`):**
+   - Both Groq and OpenRouter outputs are validated against `responseJsonSchema`.
+   - Every hypothesis must include `supporting_evidence_ids` referencing real observation tokens.
+3. **Programmatic Citation Verification:**
+   - Any response citing non-existent evidence tags (e.g., hallucinated `[E-999]`) is rejected with `INVALID_AI_OUTPUT`.
 
 ---
 
 ## 🔒 Diagnostic Privacy & Sanitization
 
-Before telemetry is transmitted to any external AI provider:
-* Authorization headers (`Authorization`, `Proxy-Authorization`), session cookies, and API keys are scrubbed.
-* URL credentials (`https://user:pass@domain.com`) are stripped.
-* Payloads are bounded to strict token budgets to prevent token exhaustion and data leakage.
-
+Before evidence leaves the VM to either Groq or OpenRouter:
+- **Authorization Headers:** Stripped completely (`Authorization`, `Proxy-Authorization`).
+- **URL Credentials:** Converted to `https://***:***@domain.com`.
+- **Sensitive Query Parameters:** Redacted (`token`, `key`, `secret`, `password`, `apiKey`).
+- **Client Sanitization:** When returning investigation records to the web browser, `serializeAnalysisForClient()` strips worker lease tokens (`lease_owner_token`, `lease_expires_at`) and redacts API keys matching `gsk_*` and `sk-or-*`.

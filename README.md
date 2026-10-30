@@ -128,10 +128,13 @@ graph TB
 - Flags contract drift instantly when APIs emit unexpected payload types or omit required properties.
 
 ### 7. Grounded AI Incident Investigation (Optional)
-- Out-of-band asynchronous worker packages telemetry into evidence snapshots (`[E1], [E2]...`).
-- Queries LLMs (Groq / OpenRouter) with strict JSON schema enforcement.
-- Mandatory citation verification programmatically rejects speculative hallucinations.
-- *Disabled by default* (`AI_PROVIDER=disabled`) to preserve 100% deterministic baseline monitoring.
+- **User-Triggered & Asynchronous:** Runs strictly out-of-band via background worker leases; never impedes monitoring probes or active alerts.
+- **Resilient Dual-Provider Fallback:**
+  - **Primary Provider:** Groq (`openai/gpt-oss-20b`) for ultra-low latency inference (~1.7s–2.0s).
+  - **Fallback Gateway:** OpenRouter routing to NVIDIA Nemotron 3.5 Lightning Free (`nvidia/nemotron-3.5-lightning:free`) on HTTP 429 rate limits, 5xx errors, timeouts, or validation failures.
+- **Anti-Hallucination Evidence Grounding:** Telemetry is packaged into immutable tokens (`[E-001]`, `[E-002]`). Hypotheses citing non-existent evidence IDs are programmatically rejected by AJV schema verification.
+- **Privacy Sanitization:** Authorization headers, session cookies, passwords, and sensitive query parameters are stripped before external transmission.
+- *Disabled by default* (`AI_PROVIDER=disabled`) for pure deterministic monitoring; enabled via `AI_PROVIDER=fallback` or `AI_FALLBACK_ENABLED=true`.
 
 ---
 

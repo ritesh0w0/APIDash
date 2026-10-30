@@ -306,7 +306,7 @@ function loadConfig(env = process.env) {
 
   const openrouterModel = env.OPENROUTER_MODEL !== undefined && env.OPENROUTER_MODEL.trim() !== ''
     ? env.OPENROUTER_MODEL.trim()
-    : 'openai/gpt-oss-20b:free';
+    : 'nvidia/nemotron-3.5-lightning:free';
 
   const rawAiTimeout = env.AI_TIMEOUT_MS !== undefined && env.AI_TIMEOUT_MS !== '' ? env.AI_TIMEOUT_MS : '30000';
   const aiTimeoutMs = Number(rawAiTimeout);
@@ -385,12 +385,12 @@ function loadConfig(env = process.env) {
     }
   }
 
-  if (aiProvider === 'fallback') {
+  if (aiFallbackEnabled || aiProvider === 'fallback') {
     if (!groqApiKey) {
-      errors.push('GROQ_API_KEY is required when AI_PROVIDER is "fallback"');
+      errors.push('GROQ_API_KEY is required when AI fallback is enabled');
     }
     if (!openrouterApiKey) {
-      errors.push('OPENROUTER_API_KEY is required when AI_PROVIDER is "fallback"');
+      errors.push('OPENROUTER_API_KEY is required when AI fallback is enabled');
     }
   }
 
@@ -533,7 +533,7 @@ function loadConfig(env = process.env) {
       fallback: {
         enabled: aiFallbackEnabled || aiProvider === 'fallback',
         primaryModel: groqModel || 'openai/gpt-oss-20b',
-        alternativeModel: 'nvidia/nemotron-3.5-super-vl:free',
+        alternativeModel: openrouterModel || 'nvidia/nemotron-3.5-lightning:free',
       },
       fallbackEnabled: aiFallbackEnabled || aiProvider === 'fallback',
       isEnabled: aiProvider !== 'disabled',

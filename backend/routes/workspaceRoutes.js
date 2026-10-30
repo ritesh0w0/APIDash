@@ -471,7 +471,7 @@ function createWorkspaceRouter(deps = {}) {
       } else if (provider === 'ollama') {
         model = (appConfig.ai && appConfig.ai.ollama && appConfig.ai.ollama.model) || 'qwen3.5:4b';
       } else if (provider === 'openrouter') {
-        model = (appConfig.ai && appConfig.ai.openrouter && appConfig.ai.openrouter.model) || 'openai/gpt-oss-20b:free';
+        model = (appConfig.ai && appConfig.ai.openrouter && appConfig.ai.openrouter.model) || 'nvidia/nemotron-3.5-lightning:free';
       } else if (provider === 'groq' || provider === 'fallback') {
         model = (appConfig.ai && appConfig.ai.groq && appConfig.ai.groq.model) || 'openai/gpt-oss-20b';
       } else if (provider === 'mock') {

@@ -304,7 +304,7 @@ class OpenRouterAiProvider extends BaseAiProvider {
     super(config, logger);
     this.apiKey = (config.ai && config.ai.openrouter && config.ai.openrouter.apiKey) || process.env.OPENROUTER_API_KEY || '';
     this.baseUrl = (config.ai && config.ai.openrouter && config.ai.openrouter.baseUrl) || process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-    this.model = (config.ai && config.ai.openrouter && config.ai.openrouter.model) || process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free';
+    this.model = (config.ai && config.ai.openrouter && config.ai.openrouter.model) || process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free';
     this.timeoutMs = (config.ai && config.ai.openrouter && config.ai.openrouter.timeoutMs) || (config.ai && config.ai.timeoutMs) || 60000;
     this.maxTokens = (config.ai && config.ai.openrouter && config.ai.openrouter.maxTokens)
       || (process.env.OPENROUTER_MAX_TOKENS ? Number(process.env.OPENROUTER_MAX_TOKENS) : null);
@@ -312,11 +312,14 @@ class OpenRouterAiProvider extends BaseAiProvider {
 
   determineResponseFormat(modelName, explicitFormat = null) {
     if (explicitFormat) return explicitFormat;
-    // Gemma models on OpenRouter generally support json_object mode rather than strict json_schema
-    if (typeof modelName === 'string' && modelName.toLowerCase().includes('gemma')) {
+    // Gemma and Nemotron models on OpenRouter reliably support standard json_object mode
+    if (
+      typeof modelName === 'string' &&
+      (modelName.toLowerCase().includes('gemma') || modelName.toLowerCase().includes('lightning'))
+    ) {
       return { type: 'json_object' };
     }
-    // GPT-OSS 20B and Nemotron 3.5 Super VL support json_schema structured output
+    // GPT-OSS 20B supports json_schema structured output
     return {
       type: 'json_schema',
       json_schema: {
@@ -363,6 +366,9 @@ class OpenRouterAiProvider extends BaseAiProvider {
       temperature: 0.1,
       max_tokens: maxTokens,
     };
+    if (typeof modelName === 'string' && modelName.toLowerCase().includes('nemotron')) {
+      requestBody.reasoning = { effort: 'none' };
+    }
     if (responseFormat) {
       requestBody.response_format = responseFormat;
     }
@@ -923,7 +929,10 @@ class FallbackAiProvider extends BaseAiProvider {
     this.tracker = options.tracker || new ProcessRateLimitTracker();
 
     this.primaryModel = options.primaryModel || (config.ai && config.ai.groq && config.ai.groq.model) || 'openai/gpt-oss-20b';
-    this.alternativeModel = options.alternativeModel || 'nvidia/nemotron-3.5-super-vl:free';
+    this.alternativeModel = options.alternativeModel
+      || (config.ai && config.ai.fallback && config.ai.fallback.alternativeModel)
+      || (config.ai && config.ai.openrouter && config.ai.openrouter.model)
+      || 'nvidia/nemotron-3.5-lightning:free';
   }
 
   async generateAnalysis(evidenceSnapshot, options = {}) {
@@ -951,10 +960,8 @@ class FallbackAiProvider extends BaseAiProvider {
     } else {
       // 2. Attempt Primary
       try {
-        const primaryResult = await this.primary.generateAnalysis(evidenceSnapshot, {
-          model: this.primaryModel,
-          ...options,
-        });
+        const primaryOptions = { ...options, model: this.primaryModel };
+        const primaryResult = await this.primary.generateAnalysis(evidenceSnapshot, primaryOptions);
 
         // Validate primary server-side output (schema & evidence references)
         const validation = validateAiResponse(primaryResult.rawText, evidenceSnapshot);
@@ -1010,10 +1017,8 @@ class FallbackAiProvider extends BaseAiProvider {
 
     // 3. Attempt Alternative (single attempt, no loops, no third provider)
     try {
-      const altResult = await this.alternative.generateAnalysis(evidenceSnapshot, {
-        model: this.alternativeModel,
-        ...options,
-      });
+      const altOptions = { ...options, model: this.alternativeModel };
+      const altResult = await this.alternative.generateAnalysis(evidenceSnapshot, altOptions);
 
       // Validate alternative server-side output against schema and evidence references
       const altValidation = validateAiResponse(altResult.rawText, evidenceSnapshot);
@@ -1087,10 +1092,13 @@ class FallbackAiProvider extends BaseAiProvider {
 function createAiProvider(overrideConfig = null, logger = defaultLogger) {
   const config = overrideConfig || loadConfig();
   const providerType = (config.ai && config.ai.provider) || 'disabled';
+  const fallbackEnabled = Boolean((config.ai && config.ai.fallbackEnabled) || providerType === 'fallback');
+
+  if (fallbackEnabled) {
+    return new FallbackAiProvider({ config }, logger);
+  }
 
   switch (providerType) {
-    case 'fallback':
-      return new FallbackAiProvider({ config }, logger);
     case 'gemini':
       return new GeminiAiProvider(config, logger);
     case 'ollama':
@@ -1098,9 +1106,6 @@ function createAiProvider(overrideConfig = null, logger = defaultLogger) {
     case 'openrouter':
       return new OpenRouterAiProvider(config, logger);
     case 'groq':
-      if (config.ai && config.ai.fallbackEnabled) {
-        return new FallbackAiProvider({ config }, logger);
-      }
       return new GroqAiProvider(config, logger);
     case 'mock':
       return new MockAiProvider(new Map(), config, logger);

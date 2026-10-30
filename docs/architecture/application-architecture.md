@@ -129,7 +129,7 @@ The application logic is decoupled from HTTP transport. All business rules resid
 4. **`contractValidatorService.js`**: Ingests OpenAPI 3.0/3.1 specifications via Scalar, compiles response JSON Schemas with AJV, and verifies production payload compliance.
 5. **`incidentService.js`**: Enforces a strict dual-threshold state machine: transitions a monitor to `OPEN` after 2 consecutive failures and marks it `RESOLVED` after 2 consecutive passes.
 6. **`notificationDispatcher.js`**: Polls the `notification_outbox` table, renders HTML alert templates, and delivers emails via Nodemailer with exponential backoff.
-7. **`aiAnalysisWorker.js`**: Background consumer for `incident_ai_analyses`. Packages diagnostic telemetry and queries configured LLM providers (Groq / OpenRouter) for structured root cause insights.
+7. **`aiAnalysisWorker.js`**: Background consumer for `incident_ai_analyses`. Packages sanitized diagnostic telemetry and queries configured LLM providers (Groq primary: `openai/gpt-oss-20b`, OpenRouter fallback gateway: `nvidia/nemotron-3.5-lightning:free`) for structured root cause insights.
 
 ---
 

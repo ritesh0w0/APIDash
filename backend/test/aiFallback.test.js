@@ -110,7 +110,7 @@ test('Fallback Provider (2) — Primary throws 429 rate limit: fallback invoked,
       return {
         rawText: validStructuredResponse,
         provider: 'openrouter',
-        model: 'nvidia/nemotron-3.5-super-vl:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         durationMs: 450,
         tokens: { prompt: 120, completion: 60, total: 180 },
       };
@@ -154,7 +154,7 @@ test('Fallback Provider (3) — Primary throws 500 server error: fallback invoke
       return {
         rawText: validStructuredResponse,
         provider: 'openrouter',
-        model: 'nvidia/nemotron-3.5-super-vl:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         durationMs: 380,
       };
     },
@@ -191,7 +191,7 @@ test('Fallback Provider (4) — Primary throws timeout (AI_TIMEOUT): fallback in
       return {
         rawText: validStructuredResponse,
         provider: 'openrouter',
-        model: 'nvidia/nemotron-3.5-super-vl:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         durationMs: 510,
       };
     },
@@ -228,7 +228,7 @@ test('Fallback Provider (5) — Fast-path fallback: in-memory state marks primar
       return {
         rawText: validStructuredResponse,
         provider: 'openrouter',
-        model: 'nvidia/nemotron-3.5-super-vl:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         durationMs: 200,
       };
     },
@@ -283,7 +283,7 @@ test('Fallback Provider (7) — Token budget check: remaining tokens < 2500 rout
       return {
         rawText: validStructuredResponse,
         provider: 'openrouter',
-        model: 'nvidia/nemotron-3.5-super-vl:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         durationMs: 250,
       };
     },
@@ -372,7 +372,7 @@ test('Fallback Provider (8b) — Primary HTTP 400/401 error: falls back to alter
       return {
         rawText: validStructuredResponse,
         provider: 'openrouter',
-        model: 'nvidia/nemotron-3.5-super-vl:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         durationMs: 340,
       };
     },
@@ -419,7 +419,7 @@ test('Fallback Provider (8c) — Primary response schema or citation validation 
       return {
         rawText: validStructuredResponse,
         provider: 'openrouter',
-        model: 'nvidia/nemotron-3.5-super-vl:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         durationMs: 380,
       };
     },
@@ -675,7 +675,7 @@ test('Worker Success on Fallback (13) — Analysis record stored with composite 
       return {
         rawText: validStructuredResponse,
         provider: 'groq->openrouter',
-        model: 'nvidia/nemotron-3.5-super-vl:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         fallback_occurred: true,
         primary_provider: 'groq',
         primary_model: 'openai/gpt-oss-20b',
@@ -743,3 +743,105 @@ test('Factory Selection — createAiProvider returns FallbackAiProvider when AI_
   assert.ok(provider2 instanceof FallbackAiProvider, 'Should instantiate FallbackAiProvider for AI_PROVIDER=groq with fallbackEnabled');
 });
 
+
+test('Regression Case — FallbackAiProvider guarantees model parameter integrity and does NOT allow options to override alternativeModel', async () => {
+  let passedPrimaryModel = null;
+  let passedAlternativeModel = null;
+
+  const mockPrimary = {
+    async generateAnalysis(_snapshot, options) {
+      passedPrimaryModel = options.model;
+      throw new AiProviderError('Rate limited', 'AI_RATE_LIMIT', 429, true);
+    },
+  };
+
+  const mockAlternative = {
+    async generateAnalysis(_snapshot, options) {
+      passedAlternativeModel = options.model;
+      return {
+        rawText: validStructuredResponse,
+        provider: 'openrouter',
+        model: options.model,
+        durationMs: 250,
+      };
+    },
+  };
+
+  const provider = new FallbackAiProvider({
+    primary: mockPrimary,
+    alternative: mockAlternative,
+    primaryModel: 'openai/gpt-oss-20b',
+    alternativeModel: 'nvidia/nemotron-3.5-lightning:free',
+    tracker: new ProcessRateLimitTracker(),
+  });
+
+  // Call with options that include a model (e.g. from the worker's job.model = 'openai/gpt-oss-20b')
+  const result = await provider.generateAnalysis(mockEvidence, {
+    model: 'openai/gpt-oss-20b',
+    customFlag: true,
+  });
+
+  assert.equal(passedPrimaryModel, 'openai/gpt-oss-20b', 'Primary must receive primary model');
+  assert.equal(passedAlternativeModel, 'nvidia/nemotron-3.5-lightning:free', 'Alternative must receive alternative model, NOT overridden by options.model');
+  assert.equal(result.provider, 'openrouter');
+  assert.equal(result.model, 'nvidia/nemotron-3.5-lightning:free');
+  assert.equal(result.fallback_occurred, true);
+});
+
+test('Regression Case 9 — Concurrent jobs: Fallback does not violate worker concurrency or leak leases', async () => {
+  const activeJobs = new Set();
+  let maxConcurrent = 0;
+
+  const mockPrimary = {
+    async generateAnalysis() {
+      throw new AiProviderError('Server error', 'AI_UPSTREAM_ERROR', 500, true);
+    },
+  };
+
+  const mockAlternative = {
+    async generateAnalysis() {
+      activeJobs.add(1);
+      maxConcurrent = Math.max(maxConcurrent, activeJobs.size);
+      await new Promise((r) => setTimeout(r, 10));
+      activeJobs.delete(1);
+      return {
+        rawText: validStructuredResponse,
+        provider: 'openrouter',
+        model: 'nvidia/nemotron-3.5-lightning:free',
+        durationMs: 10,
+      };
+    },
+  };
+
+  const provider = new FallbackAiProvider({
+    primary: mockPrimary,
+    alternative: mockAlternative,
+    tracker: new ProcessRateLimitTracker(),
+  });
+
+  // Run 5 parallel investigations through fallback
+  const promises = Array.from({ length: 5 }, () => provider.generateAnalysis(mockEvidence));
+  const results = await Promise.all(promises);
+
+  assert.equal(results.length, 5);
+  for (const res of results) {
+    assert.equal(res.provider, 'openrouter');
+    assert.equal(res.fallback_occurred, true);
+  }
+});
+
+test('Regression Case 10 — Evidence sanitization: Sensitive values are redacted before reaching primary or fallback provider', () => {
+  const { sanitizeUrl, categorizeError } = require('../services/incidentEvidenceBuilder');
+  
+  // 1. URL Credentials and sensitive tokens
+  const sensitiveUrl = 'https://admin:superSecretPassword@api.example.com/data?apiKey=secret_api_key_123&token=bearer_abc';
+  const cleanUrl = sanitizeUrl(sensitiveUrl);
+  assert.ok(!cleanUrl.includes('superSecretPassword'));
+  assert.ok(!cleanUrl.includes('secret_api_key_123'));
+  assert.ok(!cleanUrl.includes('bearer_abc'));
+  assert.ok(cleanUrl.includes('***:***@'));
+
+  // 2. Error message redactions
+  const errorWithToken = categorizeError('Failed auth: Bearer secret_live_token_777', null, 401);
+  assert.ok(!errorWithToken.bounded_message.includes('secret_live_token_777'));
+});

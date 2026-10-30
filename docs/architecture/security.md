@@ -68,3 +68,13 @@ APIDash implements strict workspace isolation:
    ```
    An authenticated user cannot read or mutate another workspace's monitors simply by guessing or iterating monitor IDs (Insecure Direct Object Reference).
 
+
+---
+
+## 🤖 AI Telemetry Sanitization & Privacy Defenses
+
+When the optional AI investigation subsystem is enabled (Groq primary, OpenRouter / NVIDIA Nemotron fallback):
+* **Egress Credential Scrubbing:** Authorization headers (`Authorization`, `Proxy-Authorization`), cookies, and API keys are stripped from execution traces prior to LLM prompt serialization.
+* **URL Credential Stripping:** Embedded user credentials in URLs are replaced with `***:***@`, and sensitive query keys (`token`, `key`, `secret`, `password`, `apiKey`) are masked as `***REDACTED***`.
+* **Out-of-Band Boundary:** AI is never in the synchronous monitoring probe or notification hot path; failure of an external AI provider can never disrupt monitor state transitions or email alert delivery.
+* **Client Data Sanitization:** `serializeAnalysisForClient()` strips worker lease tokens (`lease_owner_token`, `lease_expires_at`) and redacts API keys matching `gsk_*` and `sk-or-*` from JSON payloads returned to browsers.
