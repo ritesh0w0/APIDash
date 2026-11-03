@@ -2031,7 +2031,7 @@ async function loadContracts() {
           </div>
           ${c.description ? `<p class="contract-card-desc">${escHtml(c.description)}</p>` : '<p class="contract-card-desc text-muted">No description provided.</p>'}
           <div class="contract-card-meta">
-            <span>Updated: ${escHtml(updatedAgo)}</span>
+            ${formatDateTime(c.updated_at) ? `<span>Updated: ${escHtml(formatDateTime(c.updated_at))}</span>` : ''}
             <span>ID: ${escHtml(c.id)}</span>
           </div>
         </div>
@@ -2180,11 +2180,19 @@ async function openContractDetailModal(contractId) {
       }
     }
 
+    // Reset tab to Operations Catalog
+    document.getElementById('tabContractOps')?.classList.add('active');
+    document.getElementById('tabContractSpec')?.classList.remove('active');
+    document.getElementById('contractOpsSection')?.classList.remove('hidden');
+    document.getElementById('contractSpecSection')?.classList.add('hidden');
+
     contractDetailModal?.classList.remove('hidden');
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error');
   }
 }
+
+let currentRevisionRawSpec = '';
 
 async function loadRevisionOperations(contractId, revisionNumber) {
   if (!activeWorkspaceId) return;
@@ -2193,29 +2201,44 @@ async function loadRevisionOperations(contractId, revisionNumber) {
     const res = await apiFetch(`${getWorkspaceBaseUrl()}/contracts/${contractId}/revisions/${revisionNumber}`);
     if (!res.ok) throw new Error('Could not load revision details');
 
-    const rev = await res.json();
+    const data = await res.json();
+    const rev = data.revision || data;
+
     if (revisionMeta) {
-      const hashShort = rev.content_sha256 ? rev.content_sha256.substring(0, 16) + '...' : 'unknown';
-      revisionMeta.textContent = `SHA: ${hashShort} · Created: ${timeAgo(rev.created_at) || 'recently'}`;
+      const hashShort = rev.content_sha256 ? rev.content_sha256.substring(0, 16) + '...' : null;
+      const createdFormatted = formatDateTime(rev.created_at);
+      const metaParts = [];
+      if (hashShort) metaParts.push(`SHA: ${hashShort}`);
+      if (createdFormatted) metaParts.push(`Created: ${createdFormatted}`);
+      revisionMeta.textContent = metaParts.join(' · ');
     }
 
     let ops = [];
     try {
-      ops = typeof rev.operations === 'string' ? JSON.parse(rev.operations) : (rev.operations || []);
+      const rawOps = rev.operations_catalog !== undefined ? rev.operations_catalog : rev.operations;
+      ops = typeof rawOps === 'string' ? JSON.parse(rawOps) : (rawOps || []);
     } catch (_) {
       ops = [];
     }
 
     if (operationsCountBadge) operationsCountBadge.textContent = ops.length;
 
+    // Populate OpenAPI specification viewer
+    const specRaw = rev.specification_raw || (typeof rev.specification_content === 'string' ? rev.specification_content : JSON.stringify(rev.specification_content, null, 2)) || 'No specification content recorded.';
+    currentRevisionRawSpec = specRaw;
+    const contractSpecContent = document.getElementById('contractSpecContent');
+    const contractSpecInfo = document.getElementById('contractSpecInfo');
+    if (contractSpecContent) contractSpecContent.textContent = specRaw;
+    if (contractSpecInfo) contractSpecInfo.textContent = `OpenAPI ${rev.openapi_version || '3.x'} Specification (${specRaw.length} characters)`;
+
     if (operationsList) {
       if (ops.length === 0) {
-        operationsList.innerHTML = '<div style="padding: 20px; text-align: center;" class="text-muted">No operations declared in this revision.</div>';
+        operationsList.innerHTML = '<div style="padding: 24px; text-align: center;" class="text-muted">No individual operations cataloged. You can inspect the full specification in the "View Contract Specification" tab above.</div>';
       } else {
         const rows = ops.map((op) => `
           <tr>
             <td style="width: 80px;"><span class="op-method-tag badge-${(op.method || 'GET').toUpperCase()}">${escHtml(op.method || 'GET')}</span></td>
-            <td style="font-family: var(--font-mono); font-weight: 500;">${escHtml(op.path || '/')}</td>
+            <td style="font-family: var(--font-mono); font-weight: 500;">${escHtml(op.pathTemplate || op.path || '/')}</td>
             <td class="text-muted">${escHtml(op.summary || op.operationId || '—')}</td>
           </tr>
         `).join('');
@@ -2457,11 +2480,13 @@ async function onBindRevisionChange(contractId, revisionNumber, targetMethod = n
   try {
     const res = await apiFetch(`${getWorkspaceBaseUrl()}/contracts/${contractId}/revisions/${revisionNumber}`);
     if (!res.ok) return;
-    const rev = await res.json();
+    const data = await res.json();
+    const rev = data.revision || data;
 
     let ops = [];
     try {
-      ops = typeof rev.operations === 'string' ? JSON.parse(rev.operations) : (rev.operations || []);
+      const rawOps = rev.operations_catalog !== undefined ? rev.operations_catalog : rev.operations;
+      ops = typeof rawOps === 'string' ? JSON.parse(rawOps) : (rawOps || []);
     } catch (_) {
       ops = [];
     }
@@ -2474,9 +2499,10 @@ async function onBindRevisionChange(contractId, revisionNumber, targetMethod = n
       }
 
       ops.forEach((op) => {
+        const path = op.pathTemplate || op.path || '/';
         const opt = document.createElement('option');
-        opt.value = `${(op.method || 'GET').toUpperCase()}|${op.path}`;
-        opt.textContent = `${(op.method || 'GET').toUpperCase()} ${op.path}${op.summary ? ' - ' + op.summary : ''}`;
+        opt.value = `${(op.method || 'GET').toUpperCase()}|${path}`;
+        opt.textContent = `${(op.method || 'GET').toUpperCase()} ${path}${op.summary ? ' - ' + op.summary : ''}`;
         bindOperationSelect.appendChild(opt);
       });
 
@@ -2590,5 +2616,37 @@ unbindContractBtn?.addEventListener('click', async () => {
   } finally {
     unbindContractBtn.disabled = false;
     unbindContractBtn.textContent = 'Unbind Contract';
+  }
+});
+
+
+// ── Contract Detail Modal Tabs ──
+const tabContractOps = document.getElementById('tabContractOps');
+const tabContractSpec = document.getElementById('tabContractSpec');
+const contractOpsSection = document.getElementById('contractOpsSection');
+const contractSpecSection = document.getElementById('contractSpecSection');
+const copyContractSpecBtn = document.getElementById('copyContractSpecBtn');
+
+tabContractOps?.addEventListener('click', () => {
+  tabContractOps.classList.add('active');
+  tabContractSpec?.classList.remove('active');
+  contractOpsSection?.classList.remove('hidden');
+  contractSpecSection?.classList.add('hidden');
+});
+
+tabContractSpec?.addEventListener('click', () => {
+  tabContractSpec.classList.add('active');
+  tabContractOps?.classList.remove('active');
+  contractSpecSection?.classList.remove('hidden');
+  contractOpsSection?.classList.add('hidden');
+});
+
+copyContractSpecBtn?.addEventListener('click', async () => {
+  if (!currentRevisionRawSpec) return;
+  try {
+    await navigator.clipboard.writeText(currentRevisionRawSpec);
+    showToast('OpenAPI specification copied to clipboard!', 'success');
+  } catch (_) {
+    showToast('Failed to copy to clipboard', 'error');
   }
 });

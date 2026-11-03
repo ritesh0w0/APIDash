@@ -658,6 +658,8 @@ body {
   transition: all var(--transition);
   animation: fadeIn 0.25s ease-out;
   position: relative;
+  flex-shrink: 0;
+  min-height: min-content;
 }
 .api-card:hover {
   border-color: rgba(255, 255, 255, 0.16);
@@ -671,6 +673,8 @@ body {
   align-items: center;
   gap: 1rem;
   padding: 0.95rem 1.25rem;
+  min-height: 68px;
+  flex-shrink: 0;
 }
 
 .api-method-badge {
@@ -1758,4 +1762,78 @@ body {
   background: rgba(255, 255, 255, 0.02);
   border-radius: 6px;
   font-size: 0.8rem;
+}
+
+
+/* ── Button Utilities & Outlines ── */
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-xs {
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 4px;
+}
+.btn-danger-outline {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171 !important;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  cursor: pointer;
+}
+.btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  color: #fca5a5 !important;
+}
+.btn-primary-outline {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa !important;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  cursor: pointer;
+}
+.btn-primary-outline:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #3b82f6;
+  color: #93c5fd !important;
+}
+
+/* ── Contract Modal Header & Tabs ── */
+.contract-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 48px;
+}
+.contract-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+.tab-chip {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.tab-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+.tab-chip.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #93c5fd;
 }

@@ -75,3 +75,12 @@ Contracts are versioned via the `contract_revisions` table:
 * Monitors maintain an explicit binding to either the latest active revision or a pinned historical version.
 * Drift reports highlight historical deviations, providing engineering teams with concrete evidence when third-party microservices silently deploy breaking changes.
 
+---
+
+## 🔍 Contract Inspection & Dual-View Explorer
+
+The Contract Explorer modal (`#contractDetailModal`) provides developers and operators with a dual-view interface:
+1. **Operations Catalog:** Parses and tabulates individual HTTP operations (method badges, path templates, operation IDs, summaries, and parameters).
+2. **OpenAPI Specification Viewer:** Renders the complete, syntax-formatted raw specification (JSON or YAML) with one-click clipboard copying.
+3. **Deterministic Timestamps & Integrity:** Every revision displays its SHA-256 content checksum and exact creation timestamp formatted in localized UTC/locale time, eliminating ambiguous relative time strings.
+

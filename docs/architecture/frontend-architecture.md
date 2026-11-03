@@ -55,7 +55,7 @@ The UI features a clean modal management system:
 * **Test Result Modal:** Real-time feedback window displaying HTTP status, response headers, formatted JSON body, and assertion evaluation diffs.
 * **Incident Detail Modal:** Comprehensive incident view showing trigger event, consecutive failure streak, recovery status, and AI investigation hypotheses.
 * **Notification Settings Modal:** Workspace recipient configuration with validated member selection.
-* **Contract Explorer Modal:** Interactive path and operation navigator rendering OpenAPI operations and response schemas.
+* **Contract Explorer Modal:** Interactive dual-tab navigator rendering extracted operations, complete raw OpenAPI specification inspector, and immutable revision metadata.
 
 ---
 
@@ -63,5 +63,7 @@ The UI features a clean modal management system:
 
 * **Modern Dark Theme:** Styled with a modern, high-contrast dark aesthetic tailored for developer dashboards and network operations centers (NOC).
 * **CSS Grid & Flexbox:** Fully fluid layout adapting dynamically from 4K ultrawide displays down to mobile viewports without layout distortion.
+* **Flexbox Compression Protection:** Strict `flex-shrink: 0` and `min-height: min-content` safeguards on monitor cards prevent flex collapse when large monitor queues (8+ endpoints) are actively observed.
+* **Non-Colliding Modal Layouts:** Dedicated margin and float offsets prevent sticky modal close icons (`modal-close`) from overlapping primary action controls.
 * **Zero CSS Framework Overhead:** Pure CSS3 with CSS Custom Properties (variables) for theme consistency, avoiding bloated frameworks like Bootstrap or Tailwind.
 
