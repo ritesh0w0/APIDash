@@ -76,6 +76,25 @@ function showFeedback(msg, type = 'success') {
   addFeedback.className = `feedback ${type}`;
 }
 
+// ── Format Date & Time helper ────────────────────────────────────────────────
+function formatDateTime(isoString) {
+  if (!isoString) return null;
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
 // ── Time ago helper ───────────────────────────────────────────────────────────
 function timeAgo(dateStr) {
   if (!dateStr) return null;

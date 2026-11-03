@@ -1837,3 +1837,16 @@ body {
   border-color: rgba(59, 130, 246, 0.45);
   color: #93c5fd;
 }
+
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff !important;
+}
