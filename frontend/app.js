@@ -531,7 +531,7 @@ function renderApiList(apis) {
           <div class="api-url"  title="${escHtml(api.url)}">${escHtml(api.url)}</div>
           <div class="api-meta">
             Expected: <strong>${api.expected_status}</strong> &nbsp;·&nbsp; ID: ${api.id} &nbsp;·&nbsp;
-            <button type="button" class="badge-binding" id="bindBtn-${api.id}" title="Contract Binding">📜 Contract</button>
+            <button type="button" class="badge-binding" id="bindBtn-${api.id}" title="OpenAPI Contract Binding">📜 Contract</button>
           </div>
         </div>
         <div class="api-actions">
@@ -551,6 +551,8 @@ function renderApiList(apis) {
 
     document.getElementById(`bindBtn-${api.id}`)
       ?.addEventListener('click', () => openBindContractModal(api));
+
+
 
     const delBtn = document.getElementById(`delBtn-${api.id}`);
     let delPending = false;
@@ -2378,7 +2380,8 @@ async function openBindContractModal(api) {
     const bindingData = bindingRes.ok ? await bindingRes.json() : { binding: null };
     const currentBinding = bindingData.binding;
 
-    const contracts = contractsRes.ok ? await contractsRes.json() : [];
+    const contractsData = contractsRes.ok ? await contractsRes.json() : [];
+    const contracts = Array.isArray(contractsData) ? contractsData : (contractsData.contracts || []);
     cachedContractsList = contracts;
 
     if (bindContractSelect) {

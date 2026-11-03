@@ -25,6 +25,7 @@ This documentation suite provides a deep, component-level architectural breakdow
 | **[13. Database Design](database-design.md)** | Data Layer | Complete 20-table relational schema, migration lifecycle (1-31), foreign key constraints, indexes, connection pooling. |
 | **[14. Frontend Architecture](frontend-architecture.md)** | Client-Side SPA | Vanilla JavaScript architecture, DOM state controllers, Chart.js analytics engine, modal workflows, zero-framework design. |
 | **[15. Testing Architecture](testing-architecture.md)** | Quality Assurance | 250 automated tests, unit suites, end-to-end integration tests, multi-worker concurrency tests, synthetic AI benchmark. |
+| **[16. Visual Architecture & Methodology](system-architecture-and-methodology.md)** | Comprehensive Diagrams | Full end-to-end 5-tier system topology diagram and 9-phase closed-loop operational methodology flowchart. |
 
 ---
 
